@@ -85,28 +85,3 @@ include_directories(
     lib/lk/include
     lib/hookmgr/include
 )
-
-#[[
-# main
-add_executable(hookmgr
-    # main code
-    src/log.c
-    src/util.c
-    lib/mounts.c
-    lib/efivars.c
-    lib/android_reboot.c
-    lib/chksum/crc32.c
-    lib/hookmgr/hookmgr_test.c
-
-    # libs
-    lib/klog.c
-    lib/hookmgr/hookmgr.c
-    lib/hookmgr/hookmgr_mount.c
-    lib/hookmgr/hookmgr_io.c
-)
-target_link_libraries(hookmgr tracy pthread)
-include_directories(
-    include
-    lib/hookmgr/include
-)
-]]
