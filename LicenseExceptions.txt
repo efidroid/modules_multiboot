@@ -9,4 +9,4 @@ lib/lk: https://github.com/travisg/lk
 lib/android/recovery: https://github.com/CyanogenMod/android_bootable_recovery
 lib/android/init, lib/android/fs_mgr, lib/android/cutils: https://github.com/CyanogenMod/android_system_core
 lib/android/bionic: https://github.com/CyanogenMod/android_bionic
-lib/sepolicy-inject.c: https://bitbucket.org/joshua_brindle/sepolicy-inject
+lib/sepolicy-inject.c: https://bitbucket.org/joshua_brindle/sepolicy-inject, https://github.com/xmikos/setools-android/tree/master/jni/sepolicy-inject
