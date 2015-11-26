@@ -1,0 +1,12 @@
+LICENSE holds the license for EFIDroid's contributions in this project.
+It uses some 3rd Party code with different licenses though.
+
+These may be incompatible with this project's license and you have to remove/replace them
+if you want to use it as a closed source application.
+
+List of directories containing 3rd Party code and the sites where you can find their original source code:
+lib/lk: https://github.com/travisg/lk
+lib/android/recovery: https://github.com/CyanogenMod/android_bootable_recovery
+lib/android/init, lib/android/fs_mgr, lib/android/cutils: https://github.com/CyanogenMod/android_system_core
+lib/android/bionic: https://github.com/CyanogenMod/android_bionic
+lib/sepolicy-inject.c: https://bitbucket.org/joshua_brindle/sepolicy-inject
