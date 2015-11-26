@@ -14,8 +14,6 @@
 #define PAYLOAD_PTR(name) ((void*)&_binary_##name##_start)
 #define PAYLOAD_SIZE(name) ((unsigned)(((void*)&_binary_##name##_end) - ((void*)&_binary_##name##_start)))
 
-#define SET_BUG_INFO(x) { efivars_report_error_pr("Error %d in %s:%u in function %s", (x), __FILE__, __LINE__, __func__) }
-
 #define MBPATH_ROOT "/multiboot"
 #define MBPATH_FSTAB MBPATH_ROOT "/fstab.multiboot"
 #define MBPATH_PROC MBPATH_ROOT "/proc"
