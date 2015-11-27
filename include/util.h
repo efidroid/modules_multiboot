@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <lib/fs_mgr.h>
+
 #define WAIT_FOR_SIGNAL(sig, cond) { \
     sigset_t mask, oldmask; \
     sigemptyset (&mask); \
@@ -34,6 +36,11 @@ int util_make_loop(const char *path);
 int util_losetup(char *device, char *file, bool ro);
 int util_block_num(const char *path, unsigned long* numblocks);
 int util_dd(const char *source, const char *target, unsigned long blocks);
+int util_cp(const char *source, const char *target);
 char *util_get_fstype(const char *filename);
+char* util_get_espdir(const char* mountpoint, char* extbuf);
+char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec);
+int util_create_partition_backup(const char* device, const char* file);
+char* util_getmbpath_from_device(const char* device);
 
 #endif

@@ -11,9 +11,15 @@
 #include <sys/mount.h>
 
 #include <lib/klog.h>
+#include <lib/fs_mgr.h>
+#include <lib/efivars.h>
+#include <blkid.h>
+
 #include <common.h>
 #include <util.h>
-#include <blkid.h>
+
+#define LOG_TAG "UTIL"
+#include <lib/log.h>
 
 int sepolicy_inject_main(int argc, char **argv);
 
@@ -408,6 +414,38 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
 	return rc;
 }
 
+int util_cp(const char *source, const char *target)
+{
+	int rc;
+	int i = 0;
+	char *par[64];
+	char *buf_source = NULL, *buf_target = NULL;
+
+	// tool
+	par[i++] = MBPATH_BUSYBOX;
+	par[i++] = "cp";
+
+	// source
+	buf_source = strdup(source);
+	par[i++] = buf_source;
+
+	// target
+	buf_target = strdup(target);
+	par[i++] = buf_target;
+
+	// end
+	par[i++] = (char *)0;
+
+	// exec
+	rc = util_exec(par);
+
+	// cleanup
+	free(buf_target);
+	free(buf_source);
+
+	return rc;
+}
+
 char *util_get_fstype(const char *filename)
 {
 	const char *type;
@@ -433,4 +471,128 @@ out:
 	blkid_free_probe(pr);
 
 	return ret;
+}
+
+char* util_get_espdir(const char* mountpoint, char* extbuf) {
+    int rc;
+    char buf[PATH_MAX];
+    int use_extbuf = 0;
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    if(!multiboot_data->esp) {
+        return NULL;
+    }
+
+    if(extbuf)
+        use_extbuf = 1;
+    else
+        extbuf = buf;
+
+    // get esp directory
+    const char* espdir = NULL;
+    if(multiboot_data->esp->esp[0]=='/')
+        espdir = multiboot_data->esp->esp+1;
+    else if(!strcmp(multiboot_data->esp->esp, "datamedia"))
+        espdir = "media";
+    else {
+        EFIVARS_LOG_TRACE(-EINVAL, "Invalid ESP path %s\n", multiboot_data->esp->esp);
+        return NULL;
+    }
+
+    // build UEFIESP mountpoint
+    rc = snprintf(extbuf, PATH_MAX, "%s/%s/UEFIESP", mountpoint, espdir);
+    if(rc<0) {
+        EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    if(use_extbuf) {
+        return extbuf;
+    }
+    else {
+        // duplicate UEFIESP mountpoint
+        char* ret = strdup(extbuf);
+        if(!ret) {
+            EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for UEFIESP: %s\n", strerror(errno));
+            return NULL;
+        }
+        return ret;
+    }
+}
+
+char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec) {
+    int rc;
+    char buf[PATH_MAX];
+    char buf2[PATH_MAX];
+
+    // get espdir
+    char* espdir = util_get_espdir(mountpoint, buf);
+    if(!espdir) {
+        EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    // build partition name
+    char* name = util_basename(rec->mount_point);
+    if(!name) {
+        EFIVARS_LOG_TRACE(-1, "Can't get basename of %s\n", rec->mount_point);
+        return NULL;
+    }
+
+    // create path for loop image
+    rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", espdir, name);
+    if(rc<0) {
+        EFIVARS_LOG_TRACE(rc, "Can't build name for partition image\n");
+        return NULL;
+    }
+
+    // duplicate buffer
+    char* ret = strdup(buf2);
+    if(!ret) {
+        EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for partition name: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    return ret;
+}
+
+int util_create_partition_backup(const char* device, const char* file) {
+    int rc;
+    unsigned long num_blocks = 0;
+
+    // get number of blocks
+    util_block_num(device, &num_blocks);
+
+    // create raw image if it doesn't exists yet 
+    // or if it's size doesn't match the original partition
+    if(!util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
+        rc = util_dd(device, file, 0);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't copy %s to %s\n", device, file);
+        }
+    }
+
+    return 0;
+}
+
+char* util_getmbpath_from_device(const char* device) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+    int rc;
+    char buf[PATH_MAX];
+
+    if(!multiboot_data->blockinfo) {
+        return NULL;
+    }
+
+    uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, device);
+    if (!bi)
+        return NULL;
+
+    // build dev name
+    rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
+    if(rc<0) {
+        return NULL;
+    }
+
+    return strdup(buf);
 }
