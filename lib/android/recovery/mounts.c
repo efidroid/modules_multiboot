@@ -207,7 +207,7 @@ dump_mounted_volumes(void)
 
 
 const mounted_volume_t *
-find_mounted_volume_by_device(const char *device)
+find_mounted_volume_by_device(const char *device, int with_bindmounts)
 {
     if (g_mounts_state.volumes != NULL) {
         int i;
@@ -217,7 +217,8 @@ find_mounted_volume_by_device(const char *device)
              */
             if (v->device != NULL) {
                 if (strcmp(v->device, device) == 0) {
-                    return v;
+                    if(with_bindmounts || !strcmp(v->mount_root, "/"))
+                        return v;
                 }
             }
         }
@@ -245,7 +246,7 @@ find_mounted_volume_by_mount_point(const char *mount_point)
 }
 
 const mounted_volume_t *
-find_mounted_volume_by_majmin(unsigned major, unsigned minor)
+find_mounted_volume_by_majmin(unsigned major, unsigned minor, int with_bindmounts)
 {
     if (g_mounts_state.volumes != NULL) {
         int i;
@@ -254,7 +255,8 @@ find_mounted_volume_by_majmin(unsigned major, unsigned minor)
             /* May be null if it was unmounted and we haven't rescanned.
              */
             if (v->major == major && v->minor == minor) {
-                return v;
+                if(with_bindmounts || !strcmp(v->mount_root, "/"))
+                    return v;
             }
         }
     }

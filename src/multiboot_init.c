@@ -246,7 +246,7 @@ static void mbinit_usr_handler(int sig, siginfo_t* info, void* vp) {
     }
 
     // find ESP volume
-    const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data.espdev->major, multiboot_data.espdev->minor);
+    const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data.espdev->major, multiboot_data.espdev->minor, 0);
     if(!volume) {
         LOGE("ESP is not yet mounted\n");
         goto finish;

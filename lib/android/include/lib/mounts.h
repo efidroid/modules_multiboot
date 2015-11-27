@@ -37,11 +37,11 @@ typedef struct {
 int scan_mounted_volumes(void);
 void dump_mounted_volumes(void);
 
-const mounted_volume_t *find_mounted_volume_by_device(const char *device);
+const mounted_volume_t *find_mounted_volume_by_device(const char *device, int with_bindmounts);
 const mounted_volume_t *
 find_mounted_volume_by_mount_point(const char *mount_point);
 const mounted_volume_t *
-find_mounted_volume_by_majmin(unsigned major, unsigned minor);
+find_mounted_volume_by_majmin(unsigned major, unsigned minor, int with_bindmounts);
 
 int unmount_mounted_volume(const mounted_volume_t *volume);
 int unmount_mounted_volume_detach(const mounted_volume_t *volume);
