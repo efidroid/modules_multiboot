@@ -64,6 +64,11 @@ static int name(type* event, int code) { \
 }
 
 typedef struct {
+    dev_t dev;
+    char* path;
+} file_list_item_t;
+
+typedef struct {
     struct tracy_ll* files;
     struct tracy_ll* allocs;
     hookmgr_close_event_t* closedata;
@@ -76,8 +81,8 @@ tracy_child_addr_t hookmgr_child_alloc(struct tracy_child * child, size_t size);
 int hookmgr_child_free(struct tracy_child * child, tracy_child_addr_t addr);
 char* strfromchild(struct tracy_child *child, tracy_child_addr_t addr);
 tracy_child_addr_t strtochild(struct tracy_child * child, const char *path);
-int lindev_from_path(const char* filename, int* major, int* minor, int resolve_symlinks);
-int lindev_from_mountpoint(const char* mountpoint, int* major, int* minor);
+int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks);
+int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor);
 
 int hookmgr_hook_mount(struct tracy_event *e);
 int hookmgr_hook_umount(struct tracy_event *e);

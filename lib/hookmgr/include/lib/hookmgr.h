@@ -64,6 +64,7 @@ typedef struct hookmgr_open_event {
     int returncode;
     struct tracy_event *tracyevent;
     tracy_child_addr_t alloc_pathname;
+    dev_t dev;
 } hookmgr_open_event_t;
 
 typedef struct hookmgr_close_event {
@@ -96,8 +97,8 @@ typedef struct hookmgr_truncate_event {
 typedef struct hookmgr_device {
     struct list_node node;
     hookmgr_t* mgr;
-    int major;
-    int minor;
+    unsigned major;
+    unsigned minor;
 
     void (*mount)(
         struct hookmgr_device* dev,

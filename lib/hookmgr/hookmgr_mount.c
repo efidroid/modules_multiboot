@@ -81,7 +81,7 @@ int hookmgr_hook_mount(struct tracy_event *e) {
         hookevent->set_data = hookmgr_mount_set_data;
         hookevent->abort = hookmgr_mount_abort;
 
-        int major, minor;
+        unsigned major, minor;
 
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->source, &major, &minor, 1);
@@ -138,7 +138,7 @@ int hookmgr_hook_umount(struct tracy_event *e) {
         hookevent->set_flags = hookmgr_umount_set_flags;
         hookevent->abort = hookmgr_umount_abort;
 
-        int major, minor;
+        unsigned major, minor;
 
         // ignore devices we can't find
         rc = lindev_from_mountpoint(hookevent->target, &major, &minor);

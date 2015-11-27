@@ -150,7 +150,7 @@ err:
 	return NULL;
 }
 
-int lindev_from_path(const char* filename, int* major, int* minor, int resolve_symlinks) {
+int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks) {
     int rc;
     struct stat sb;
 
@@ -167,7 +167,7 @@ int lindev_from_path(const char* filename, int* major, int* minor, int resolve_s
     return 0;
 }
 
-int lindev_from_mountpoint(const char* mountpoint, int* major, int* minor) {
+int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor) {
     int rc;
     const mounted_volume_t* volume;
 

@@ -131,11 +131,13 @@ int hookmgr_hook_open(struct tracy_event *e) {
         hookevent->set_mode = hookmgr_open_set_mode;
         hookevent->abort = hookmgr_open_abort;
 
-        int major, minor;
+        unsigned major, minor;
 
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
         if(!rc) {
+            hookevent->dev = makedev(major, minor);
+
 	        // call open hook
 	        hookmgr_device_t *entry;
 	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
@@ -166,8 +168,17 @@ int hookmgr_hook_open(struct tracy_event *e) {
 
         if(!hookevent->do_abort) {
             // store filename
-            if(e->child->return_code>=0)
-                ll_add(cdata->files, e->child->return_code, strdup(hookevent->pathname));
+            if(e->child->return_code>=0) {
+                file_list_item_t* item = malloc(sizeof(file_list_item_t));
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                    return TRACY_HOOK_ABORT;
+                }
+
+                item->dev = hookevent->dev;
+                item->path = strdup(hookevent->pathname);
+                ll_add(cdata->files, e->child->return_code, item);
+            }
         }
 
         // cleanup
@@ -253,12 +264,14 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 
             else {
                 struct tracy_ll_item* item = ll_find(cdata->files, dirfd);
-                if(!item) {
+                if(!item || !item->data) {
                     EFIVARS_LOG_FATAL(-1, "invalid FD\n");
                     return TRACY_HOOK_ABORT;
                 }
 
-                const char* fdpath = (const char*)item->data;
+                file_list_item_t* fditem = item->data;
+
+                const char* fdpath = (const char*)fditem->path;
                 // check if there's a trailing slash
                 int fdpathlen = strlen(fdpath);
                 int trailingslash = 0;
@@ -276,7 +289,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
             }
         }
 
-        int major, minor;
+        unsigned major, minor;
 
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
@@ -284,6 +297,8 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 	        // call open hook
 	        hookmgr_device_t *entry;
 	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+                hookevent->dev = makedev(major, minor);
+
                 if(entry->open && entry->major==major && entry->minor==minor) {
                     // change args for open()
                     const char* name = hookevent->pathname;
@@ -318,8 +333,17 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                     hookevent->do_abort = 1;
 
                     // add fd to our list
-                    if(e->child->return_code>=0)
-                        ll_add(cdata->files, e->child->return_code, strdup(hookevent->pathname));
+                    if(e->child->return_code>=0) {
+                        file_list_item_t* item = malloc(sizeof(file_list_item_t));
+                        if(!item) {
+                            EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                            return TRACY_HOOK_ABORT;
+                        }
+
+                        item->dev = hookevent->dev;
+                        item->path = strdup(hookevent->pathname);
+                        ll_add(cdata->files, e->child->return_code, item);
+                    }
                     
                     break;
                 }
@@ -336,8 +360,17 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 
         if(!hookevent->do_abort) {
             // add fd to our list
-            if(e->args.return_code>=0)
-                ll_add(cdata->files, e->args.return_code, strdup(hookevent->pathname));
+            if(e->args.return_code>=0) {
+                file_list_item_t* item = malloc(sizeof(file_list_item_t));
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                    return TRACY_HOOK_ABORT;
+                }
+
+                item->dev = hookevent->dev;
+                item->path = strdup(hookevent->pathname);
+                ll_add(cdata->files, e->args.return_code, item);
+            }
         }
 
         // cleanup
@@ -355,7 +388,6 @@ hookmgr_abort_function(hookmgr_close_abort, hookmgr_close_event_t);
 int hookmgr_hook_close(struct tracy_event *e) {
     hookmgr_t* mgr = mgr_from_event(e);
     hookmgr_child_data_t *cdata = e->child->custom;
-    int rc;
     int tracyrc = TRACY_HOOK_CONTINUE;
     hookmgr_close_event_t* hookevent = NULL;
 
@@ -379,33 +411,28 @@ int hookmgr_hook_close(struct tracy_event *e) {
         hookevent->set_fd = hookmgr_close_set_fd;
         hookevent->abort = hookmgr_close_abort;
 
-        int major, minor;
-
         struct tracy_ll_item* item = ll_find(cdata->files, hookevent->fd);
-        if(item) {
-            hookevent->pathname = (const char*)item->data;
-            // ignore devices we can't find
-            // TODO: use majmin instead of path because it  may not exist anymore
-            rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
-            if(!rc) {
-	            // call close hook
-	            hookmgr_device_t *entry;
-	            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
-                    if(entry->close && entry->major==major && entry->minor==minor) {
-                        entry->close(entry, hookevent);
+        if(item && item->data) {
+            file_list_item_t* fditem = item->data;
+            hookevent->pathname = fditem->path;
 
-                        // check if we were requested to abort the syscall
-                        if(hookevent->do_abort) {
-                            e->child->return_code = hookevent->returncode;
-                            e->child->change_return_code = 1;
-                            tracyrc = TRACY_HOOK_DENY;
+            // call close hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+                if(entry->close && entry->major==major(fditem->dev) && entry->minor==minor(fditem->dev)) {
+                    entry->close(entry, hookevent);
 
-                            break;
-                        }
-                        
+                    // check if we were requested to abort the syscall
+                    if(hookevent->do_abort) {
+                        e->child->return_code = hookevent->returncode;
+                        e->child->change_return_code = 1;
+                        tracyrc = TRACY_HOOK_DENY;
+
                         break;
                     }
-	            }
+
+                    break;
+                }
             }
         }
     }
@@ -419,8 +446,13 @@ int hookmgr_hook_close(struct tracy_event *e) {
 
         if(!hookevent->do_abort) {
             // remove fd from our list
-            if(e->args.return_code>=0)
+            if(e->args.return_code>=0) {
+                struct tracy_ll_item* item = ll_find(cdata->files, hookevent->fd);
+                if(item && item->data) {
+                    free(item->data);
+                }
                 ll_del(cdata->files, hookevent->fd);
+            }
         }
 
         // cleanup
@@ -449,7 +481,7 @@ int hookmgr_hook_generic_truncate(struct tracy_event *e) {
         hookevent->set_pathname = hookmgr_generic_truncate_set_pathname;
         hookevent->abort = hookmgr_generic_truncate_abort;
 
-        int major, minor;
+        unsigned major, minor;
         
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
