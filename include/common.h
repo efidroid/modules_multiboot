@@ -25,6 +25,8 @@
 #define MBPATH_TRIGGER_POSTFS_DATA MBPATH_BIN "/trigger-postfs-data"
 #define POSTFS_NOTIFICATION_FILE "/dev/.trigger-postfs-data"
 
+#define unused __attribute__((unused))
+
 extern size_t strlcat(char* __restrict, const char* __restrict, size_t);
 extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
 

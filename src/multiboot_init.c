@@ -221,9 +221,7 @@ static int selinux_fixup(void) {
 }
 
 static volatile sig_atomic_t mbinit_usr_interrupt = 0;
-static void mbinit_usr_handler(int sig, siginfo_t* info, void* vp) {
-    (void)(sig);
-    (void)(vp);
+static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp) {
     int rc;
     int i;
     char buf[PATH_MAX];
@@ -373,18 +371,12 @@ finish:
 }
 
 static volatile sig_atomic_t init_usr_interrupt = 0;
-static void init_usr_handler(int sig, siginfo_t* info, void* vp) {
-    (void)(sig);
-    (void)(info);
-    (void)(vp);
-
+static void init_usr_handler(unused int sig, unused siginfo_t* info, unused void* vp) {
     // stop waiting for signals
     init_usr_interrupt = 1;
 }
 
-int multiboot_main(int argc, char** argv) {
-    (void)(argc);
-    (void)(argv);
+int multiboot_main(unused int argc, char** argv) {
     (void)(device_matches);
 
     int rc = 0;

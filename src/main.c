@@ -14,19 +14,12 @@
 #include <lib/log.h>
 
 static volatile sig_atomic_t usr_interrupt = 0;
-static void synch_signal(int sig, siginfo_t* info, void* vp) {
-    (void)(sig);
-    (void)(info);
-    (void)(vp);
-
+static void synch_signal(unused int sig, unused siginfo_t* info, unused void* vp) {
     // stop waiting for signals
     usr_interrupt = 1;
 }
 
 int trigger_postfsdata_main(int argc, char** argv) {
-    (void)(argc);
-    (void)(argv);
-
     if(argc!=2)
         return -EINVAL;
 
