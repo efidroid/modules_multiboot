@@ -219,7 +219,7 @@ static int efivar_read_to_buf(const char* device, void** buf, uint32_t* outdatas
         }
 
         // verify CRC32
-        uint32_t crc32sum = crc32(0, data, hdr.data_size);
+        uint32_t crc32sum = cksum_crc32(0, data, hdr.data_size);
         if(hdr.crc32!=crc32sum) {
             LOGE("Invalid checksum\n");
             rc = -EIO;
@@ -502,7 +502,7 @@ int efivar_set(const char* name, efi_guid_t* guid,
     uint32_t* newdata32 = newdata;
     newdata32[0] = EFIVAR_MAGIC;
     newdata32[1] = newdatasize;
-    newdata32[2] = crc32(0, newdata + 3*sizeof(uint32_t), newdatasize);
+    newdata32[2] = cksum_crc32(0, newdata + 3*sizeof(uint32_t), newdatasize);
 
     rc = efivar_write_from_buf(efivar_getdev(), newdata, sizeof(efivar_hdr_t)+newdatasize);
 
