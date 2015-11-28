@@ -264,8 +264,12 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 
             else {
                 struct tracy_ll_item* item = ll_find(cdata->files, dirfd);
-                if(!item || !item->data) {
-                    EFIVARS_LOG_FATAL(-1, "invalid FD\n");
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-ENOENT, "FD %d not found\n", dirfd);
+                    return TRACY_HOOK_ABORT;
+                }
+                if(!item->data) {
+                    EFIVARS_LOG_FATAL(-EINVAL, "no item data\n");
                     return TRACY_HOOK_ABORT;
                 }
 
