@@ -65,48 +65,6 @@ typedef int (*efivar_callback_t)(void* pdata, const uint16_t* name, const uint32
 static char* errorbuf = NULL;
 static size_t errorbuf_len = 0;
 
-// TODO: remove
-static void hexdump(const void *ptr, size_t len)
-{
-	addr_t address = (addr_t)ptr;
-	size_t count;
-
-	for (count = 0 ; count < len; count += 16) {
-		union {
-			uint32_t buf[4];
-			uint8_t  cbuf[16];
-		} u;
-		size_t s = ROUNDUP(MIN(len - count, 16), 4);
-		size_t i;
-
-		LOGI("0x%08lx: ", address);
-		for (i = 0; i < s / 4; i++) {
-			u.buf[i] = ((const uint32_t *)address)[i];
-			LOGI("%08x ", u.buf[i]);
-		}
-		for (; i < 4; i++) {
-			LOGI("         ");
-		}
-		LOGI("|");
-
-		for (i=0; i < 16; i++) {
-			char c = u.cbuf[i];
-			if (i < s && isprint(c)) {
-				LOGI("%c", c);
-			} else {
-				LOGI(".");
-			}
-		}
-		LOGI("|\n");
-		address += 16;
-	}
-}
-
-static void prstr16(const uint16_t* str16) {
-    while(*str16) {
-        LOGI("%lc", *str16++);
-    }
-}
 
 static int copy_ansi2unicodestr(uint16_t** outdst, const char* src, size_t* outsz) {
     uint16_t* dst = NULL;
@@ -352,22 +310,6 @@ static int efivar_append(void** buf, const uint16_t* name, const uint32_t namesi
     return 0;
 }
 
-static int efivar_dump_cb(void* pdata, const uint16_t* name, const uint32_t namesize, const void* data,
-                                 const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
-{
-    (void)(pdata);
-    (void)(namesize);
-
-    prstr16(name);
-    LOGI("(%08x-%04x-%04x-%x%x-%02x%02x%02x%02x%02x%02x)/%x:\n", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
-                                    guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7], attributes);
-
-    hexdump(data, datasize);
-    LOGI("\n");
-    
-    return 0;   
-}
-
 static int efivar_setvar_cb(void* _pdata, const uint16_t* name, const uint32_t namesize, const void* data,
                                  const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
 {
@@ -393,22 +335,6 @@ static int efivar_setvar_cb(void* _pdata, const uint16_t* name, const uint32_t n
         return efivar_append(&pdata->buf, name, namesize, data, datasize, guid, attributes);
 
     return 0;
-}
-
-int efivar_dump(void) {
-    void* rawdata = NULL;
-    uint32_t rawdatasize = 0;
-    int rc = 0;
-
-    // read variable data into buffer
-    rc = efivar_read_to_buf(efivar_getdev(), &rawdata, &rawdatasize);
-    if(rc || !rawdata) {
-        LOGE("Error reading variable into buffer\n");
-        return rc;
-    }
-
-    // dump variables
-    return efivar_iterate(rawdata, rawdatasize, efivar_dump_cb, NULL);
 }
 
 int efivar_get(const char* name, efi_guid_t* guid,
