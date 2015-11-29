@@ -151,6 +151,10 @@ uevent_block_t *get_blockinfo_for_path(uevent_block_info_t *info, const char *pa
     const char* search_devname = NULL;
 	uevent_block_t *ret = NULL;
 
+    int mbpath_len = strlen(MBPATH_ROOT);
+    if(!strncmp(path, MBPATH_ROOT, mbpath_len))
+        path+=mbpath_len;
+
 	if (strstr(path, "by-name") != NULL) {
 		search_name = util_basename(path);
         if(!search_name) {
