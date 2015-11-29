@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/mount.h>
+#include <fcntl.h>
 
 #include <lib/efivars.h>
 #include <lib/fs_mgr.h>
@@ -36,6 +37,10 @@ static void dev_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_t* 
     hookdev_pdata_t* pdata = (hookdev_pdata_t*)dev;
     int rc;
     const char* mountpoint = NULL;
+
+    if(!(event->flags & O_WRONLY) && !(event->flags & O_RDWR)) {
+        return;
+    }
 
     // scan mounted volumes
     rc = scan_mounted_volumes();
