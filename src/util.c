@@ -319,7 +319,7 @@ int util_losetup(char *_device, char *_file, bool ro)
     // duplicate arguments
     char* device = strdup(_device);
     char* file = strdup(_file);
-    if(!file || !file) return -ENOMEM;
+    if(!device || !file) return -ENOMEM;
 
 	// tool
 	par[i++] = MBPATH_BUSYBOX;
