@@ -86,7 +86,7 @@ static void dev_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_t* 
     }
 
     // copy loop to esp
-    rc = util_create_partition_backup(pdata->loopdevice, espfilename);
+    rc = util_dd(pdata->loopdevice, espfilename, 0);
     if(rc) {
         EFIVARS_LOG_FATAL(rc, "Can't create partition image\n");
         return;
