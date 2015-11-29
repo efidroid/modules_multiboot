@@ -50,8 +50,7 @@ int main(int argc, char** argv) {
     else {
         int rc = multiboot_main(argc, argv);
         if(rc) {
-            efivars_report_errorbuf();
-            return rc;
+            return EFIVARS_LOG_FATAL(rc, "multiboot_main returned: %s\n", strerror(-rc));
         }
     }
 
