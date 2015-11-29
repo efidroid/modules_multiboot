@@ -25,6 +25,8 @@
 
 #include <lib/mounts.h>
 
+#include <common.h>
+
 #define LOG_TAG "MOUNTS"
 #include <lib/log.h>
 
@@ -55,6 +57,7 @@ free_volume_internals(const mounted_volume_t *volume, int zero)
 }
 
 #define PROC_MOUNTS_FILENAME   "/proc/1/mountinfo"
+#define MBPROC_MOUNTS_FILENAME MBPATH_PROC"/1/mountinfo"
 #define PROC_MOUNTS_BUFSIZE 4096
 int
 scan_mounted_volumes(void)
@@ -92,6 +95,9 @@ scan_mounted_volumes(void)
     /* Open and read the file contents.
      */
     fd = open(PROC_MOUNTS_FILENAME, O_RDONLY);
+    if (fd < 0) {
+        fd = open(MBPROC_MOUNTS_FILENAME, O_RDONLY);
+    }
     if (fd < 0) {
         goto bail;
     }
