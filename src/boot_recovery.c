@@ -32,7 +32,7 @@ static void dev_open(hookmgr_device_t* dev, hookmgr_open_event_t* event) {
     event->set_pathname(event, pdata->loopdevice);
 }
 
-static void dev_close(hookmgr_device_t* dev, unused hookmgr_close_event_t* event) {
+static void dev_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_t* event) {
     hookdev_pdata_t* pdata = (hookdev_pdata_t*)dev;
     int rc;
     const char* mountpoint = NULL;
@@ -238,7 +238,7 @@ int boot_recovery(void) {
         pdata->dev.major = bi->major;
         pdata->dev.minor = bi->minor;
         pdata->dev.open = dev_open;
-        pdata->dev.close = dev_close;
+        pdata->dev.close_post = dev_close_post;
         pdata->loopdevice = strdup(buf);
         pdata->rec = rec;
 
