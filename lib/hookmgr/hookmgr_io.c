@@ -30,6 +30,7 @@
 #include <tracy.h>
 
 #include <common.h>
+#include <util.h>
 
 #define LOG_TAG "HOOKMGR_IO"
 #include <lib/log.h>
@@ -177,6 +178,7 @@ int hookmgr_hook_open(struct tracy_event *e) {
 
                 item->dev = hookevent->dev;
                 item->path = strdup(hookevent->pathname);
+                item->flags = hookevent->flags;
                 ll_add(cdata->files, e->child->return_code, item);
             }
         }
@@ -346,6 +348,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 
                         item->dev = hookevent->dev;
                         item->path = strdup(hookevent->pathname);
+                        item->flags = hookevent->flags;
                         ll_add(cdata->files, e->child->return_code, item);
                     }
                     
@@ -373,6 +376,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
 
                 item->dev = hookevent->dev;
                 item->path = strdup(hookevent->pathname);
+                item->flags = hookevent->flags;
                 ll_add(cdata->files, e->args.return_code, item);
             }
         }
@@ -419,6 +423,7 @@ int hookmgr_hook_close(struct tracy_event *e) {
         if(item && item->data) {
             file_list_item_t* fditem = item->data;
             hookevent->pathname = fditem->path;
+            hookevent->flags = fditem->flags;
 
             // call close hook
             hookmgr_device_t *entry;
@@ -439,6 +444,11 @@ int hookmgr_hook_close(struct tracy_event *e) {
                 }
             }
         }
+        else {
+            char* name = util_fd2name(e->child->pid, hookevent->fd);
+            LOGV("(close) can't find info for fd %d - %s\n", hookevent->fd, name);
+            free(name);
+        }
     }
 
     else {
@@ -450,7 +460,7 @@ int hookmgr_hook_close(struct tracy_event *e) {
 
         if(!hookevent->do_abort) {
             // remove fd from our list
-            if(e->args.return_code>=0) {
+            if(e->args.return_code==0) {
                 struct tracy_ll_item* item = ll_find(cdata->files, hookevent->fd);
                 if(item && item->data) {
                     // call close_post hook
@@ -465,6 +475,9 @@ int hookmgr_hook_close(struct tracy_event *e) {
                     }
 
                     free(item->data);
+                }
+                else {
+                    LOGV("(closepost) can't find info for fd %d\n", hookevent->fd);
                 }
                 ll_del(cdata->files, hookevent->fd);
             }
@@ -523,6 +536,224 @@ int hookmgr_hook_generic_truncate(struct tracy_event *e) {
 
         // cleanup
         free((void*)hookevent->pathname);
+    }
+
+    return tracyrc;
+}
+
+int hookmgr_hook_generic_dup(struct tracy_event *e) {
+    hookmgr_child_data_t *cdata = e->child->custom;
+    int tracyrc = TRACY_HOOK_CONTINUE;
+    hookmgr_dup_event_t* hookevent = NULL;
+
+    if (e->child->pre_syscall) {
+        if(cdata->dupdata) {
+            EFIVARS_LOG_FATAL(-1, "cdata->dupdata is not empty\n");
+            return TRACY_HOOK_ABORT;
+        }
+
+        hookevent = calloc(sizeof(hookmgr_dup_event_t), 1);
+        if(!hookevent) {
+            EFIVARS_LOG_FATAL(-1, "can't allocate cdata\n");
+            return TRACY_HOOK_ABORT;
+        }
+        cdata->dupdata = hookevent;
+
+        hookevent->oldfd = (int)e->args.a0;
+        hookevent->newfd = (int)e->args.a1;
+        hookevent->flags = (int)e->args.a2;
+    }
+
+    else {
+        hookevent = cdata->dupdata;
+        if(!hookevent) {
+            LOGW("cdata->dupdata is NULL\n");
+            return tracyrc;
+        }
+
+
+        int ret = (int)e->args.return_code;
+        if(ret>=0) {
+            struct tracy_ll_item* item = ll_find(cdata->files, hookevent->oldfd);
+            if(item && item->data) {
+                file_list_item_t* fditem = item->data;
+
+                file_list_item_t* newfditem = fditem_dup(fditem);
+                if(!newfditem) {
+                    EFIVARS_LOG_FATAL(-1, "can't duplicate fditem\n");
+                    return TRACY_HOOK_ABORT;
+                }
+
+                if(e->syscall_num==SYS_dup3)
+                    newfditem->flags |= hookevent->flags;
+
+                // newfd got silently closed
+                if(ll_find(cdata->files, ret))
+                    ll_del(cdata->files, ret);
+
+                ll_add(cdata->files, ret, newfditem);
+            }
+            else {
+                char* name = util_fd2name(e->child->pid, hookevent->oldfd);
+                LOGV("(dup) can't find info for fd %d - %s\n", hookevent->oldfd, name);
+                free(name);
+            }
+        }
+
+        // cleanup
+        free(hookevent);
+        cdata->dupdata = NULL;
+    }
+
+    return tracyrc;
+}
+
+int hookmgr_hook_generic_pipe(struct tracy_event *e) {
+    hookmgr_child_data_t *cdata = e->child->custom;
+    int tracyrc = TRACY_HOOK_CONTINUE;
+    hookmgr_pipe_event_t* hookevent = NULL;
+
+    if (e->child->pre_syscall) {
+        if(cdata->pipedata) {
+            EFIVARS_LOG_FATAL(-1, "cdata->pipedata is not empty\n");
+            return TRACY_HOOK_ABORT;
+        }
+
+        hookevent = calloc(sizeof(hookmgr_pipe_event_t), 1);
+        if(!hookevent) {
+            EFIVARS_LOG_FATAL(-1, "can't allocate cdata\n");
+            return TRACY_HOOK_ABORT;
+        }
+        cdata->pipedata = hookevent;
+
+        hookevent->pipesaddr = (tracy_child_addr_t)e->args.a0;
+        hookevent->flags = (int)e->args.a2;
+    }
+
+    else {
+        hookevent = cdata->pipedata;
+        if(!hookevent) {
+            LOGW("cdata->pipedata is NULL\n");
+            return tracyrc;
+        }
+
+
+        int ret = (int)e->args.return_code;
+        if(ret>=0) {
+            hookevent->pipefd = (int*)datafromchild(e->child, hookevent->pipesaddr, sizeof(int)*2);
+            if(hookevent->pipesaddr && !hookevent->pipefd) {
+                EFIVARS_LOG_FATAL(-1, "Can't receive arguments\n");
+                return TRACY_HOOK_ABORT;
+            }
+
+
+            file_list_item_t* item = malloc(sizeof(file_list_item_t));
+            if(!item) {
+                EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                return TRACY_HOOK_ABORT;
+            }
+            item->dev = 0;
+            item->path = strdup("pipe0");
+            item->flags = hookevent->flags;
+            ll_add(cdata->files, hookevent->pipefd[0], item);
+
+            item = malloc(sizeof(file_list_item_t));
+            if(!item) {
+                EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                return TRACY_HOOK_ABORT;
+            }
+            item->dev = 0;
+            item->path = strdup("pipe1");
+            item->flags = hookevent->flags;
+            ll_add(cdata->files, hookevent->pipefd[1], item);
+        }
+
+        // cleanup
+        free(hookevent);
+        cdata->pipedata = NULL;
+    }
+
+    return tracyrc;
+}
+
+int hookmgr_hook_generic_socket(struct tracy_event *e) {
+    hookmgr_child_data_t *cdata = e->child->custom;
+    int tracyrc = TRACY_HOOK_CONTINUE;
+    hookmgr_socket_event_t* hookevent = NULL;
+
+    if (e->child->pre_syscall) {
+        if(cdata->socketdata) {
+            EFIVARS_LOG_FATAL(-1, "cdata->socketdata is not empty\n");
+            return TRACY_HOOK_ABORT;
+        }
+
+        hookevent = calloc(sizeof(hookmgr_socket_event_t), 1);
+        if(!hookevent) {
+            EFIVARS_LOG_FATAL(-1, "can't allocate cdata\n");
+            return TRACY_HOOK_ABORT;
+        }
+        cdata->socketdata = hookevent;
+
+        hookevent->domain = (int)e->args.a0;
+        hookevent->type = (int)e->args.a1;
+        hookevent->protocol = (int)e->args.a2;
+        if(e->syscall_num==SYS_socketpair)
+            hookevent->svaddr = (tracy_child_addr_t)e->args.a3;
+    }
+
+    else {
+        hookevent = cdata->socketdata;
+        if(!hookevent) {
+            LOGW("cdata->socketdata is NULL\n");
+            return tracyrc;
+        }
+
+        int ret = (int)e->args.return_code;
+        if(ret>=0) {
+            if(e->syscall_num==SYS_socketpair) {
+                hookevent->sv = (int*)datafromchild(e->child, hookevent->svaddr, sizeof(int)*2);
+                if(hookevent->svaddr && !hookevent->sv) {
+                    EFIVARS_LOG_FATAL(-1, "Can't receive arguments\n");
+                    return TRACY_HOOK_ABORT;
+                }
+
+                file_list_item_t* item = malloc(sizeof(file_list_item_t));
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                    return TRACY_HOOK_ABORT;
+                }
+                item->dev = 0;
+                item->path = strdup("socketpair0");
+                item->flags = 0;
+                ll_add(cdata->files, hookevent->sv[0], item);
+
+                item = malloc(sizeof(file_list_item_t));
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                    return TRACY_HOOK_ABORT;
+                }
+                item->dev = 0;
+                item->path = strdup("socketpair1");
+                item->flags = 0;
+                ll_add(cdata->files, hookevent->sv[1], item);
+            }
+
+            else {
+                file_list_item_t* item = malloc(sizeof(file_list_item_t));
+                if(!item) {
+                    EFIVARS_LOG_FATAL(-1, "can't allocate list item data\n");
+                    return TRACY_HOOK_ABORT;
+                }
+                item->dev = 0;
+                item->path = strdup("socket");
+                item->flags = 0;
+                ll_add(cdata->files, ret, item);
+            }
+        }
+
+        // cleanup
+        free(hookevent);
+        cdata->socketdata = NULL;
     }
 
     return tracyrc;

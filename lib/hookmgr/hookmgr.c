@@ -44,6 +44,37 @@ if (rc) { \
 	goto error; \
 }
 
+/**
+ * Get the parent PID from a PID
+ * @param pid pid
+ * @param ppid parent process id
+ *
+ * Note: init is 1 and it has a parent id of 0.
+ * Source: https://gist.github.com/fclairamb/a16a4237c46440bdb172
+ */
+static int get_process_parent_id(const pid_t pid, pid_t * ppid) {
+    int rc = -1;
+	char buffer[BUFSIZ];
+	sprintf(buffer, "/proc/%d/stat", pid);
+	FILE* fp = fopen(buffer, "r");
+	if (fp) {
+		size_t size = fread(buffer, sizeof (char), sizeof (buffer), fp);
+		if (size > 0) {
+			// See: http://man7.org/linux/man-pages/man5/proc.5.html section /proc/[pid]/stat
+			strtok(buffer, " "); // (1) pid  %d
+			strtok(NULL, " "); // (2) comm  %s
+			strtok(NULL, " "); // (3) state  %c
+			char * s_ppid = strtok(NULL, " "); // (4) ppid  %d
+			*ppid = atoi(s_ppid);
+            rc = 0;
+		}
+		fclose(fp);
+	}
+
+    return rc;
+}
+
+
 tracy_child_addr_t hookmgr_child_alloc(struct tracy_child * child, size_t size)
 {
 	long rc;
@@ -150,6 +181,31 @@ err:
 	return NULL;
 }
 
+void* datafromchild(struct tracy_child *child, tracy_child_addr_t addr, size_t len)
+{
+	void* buf = NULL;
+    int rc;
+
+    if(!addr)
+        return NULL;
+
+    buf = malloc(len);
+    if(!buf) {
+        EFIVARS_LOG_TRACE(-errno, "Can't allocate buffer\n");
+		return NULL;
+    }
+
+	// read string
+    rc = tracy_read_mem(child, buf, addr, len);
+	if (rc < 0) {
+        free(buf);
+        EFIVARS_LOG_TRACE(rc, "tracy_read_mem returned an error\n");
+		return NULL;
+	}
+
+	return buf;
+}
+
 int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks) {
     int rc;
     struct stat sb;
@@ -187,6 +243,15 @@ int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* mi
     return 0;
 }
 
+static struct tracy_child* tracy_get_child(struct tracy* t, pid_t pid) {
+    struct tracy_ll_item *item;
+
+    item = ll_find(t->childs, pid);
+    if(!item) return NULL;
+
+    return (struct tracy_child*)item->data;
+}
+
 static void hookmgr_child_create(struct tracy_child *child)
 {
 	if (child->custom) {
@@ -219,6 +284,39 @@ static void hookmgr_child_create(struct tracy_child *child)
 		EFIVARS_LOG_TRACE(errno, "can't allocate list for allocations\n");
         tracy_quit(child->tracy, errno);
         return;
+    }
+
+    if(child->pid!=child->tracy->fpid) {
+        pid_t ppid;
+        int rc = get_process_parent_id(child->pid, &ppid);
+        if(rc) {
+		    EFIVARS_LOG_TRACE(errno, "can't get parent process\n");
+            tracy_quit(child->tracy, errno);
+            return;
+        }
+
+        struct tracy_child* pchild = tracy_get_child(child->tracy, ppid);
+        if(!pchild) {
+		    EFIVARS_LOG_TRACE(errno, "can't get parent tracy child\n");
+            tracy_quit(child->tracy, errno);
+            return;
+        }
+
+	    hookmgr_child_data_t *pcdata = pchild->custom;
+
+        // transfer all fd's
+        struct tracy_ll_item *t;
+        tracy_ll_each(pcdata->files, t) {
+            file_list_item_t* fditem = t->data;
+            if(!(fditem->flags & O_CLOEXEC)) {
+                file_list_item_t* newfditem = fditem_dup(fditem);
+                if(!newfditem) {
+                    tracy_quit(child->tracy, errno);
+                    return;
+                }
+                ll_add(cdata->files, t->id, newfditem);
+            }
+        }
     }
 }
 
@@ -273,6 +371,7 @@ hookmgr_t* hookmgr_init(struct tracy *tracy) {
     try_hook(umount2, hookmgr_hook_umount);
 
     // IO
+    // TODO: O_NOFOLLOW, O_TMPFILE(3.11)
     try_hook(open, hookmgr_hook_open);
     try_hook(openat, hookmgr_hook_openat);
     try_hook(close, hookmgr_hook_close);
@@ -280,6 +379,14 @@ hookmgr_t* hookmgr_init(struct tracy *tracy) {
     try_hook(truncate, hookmgr_hook_generic_truncate);
     try_hook(truncate64, hookmgr_hook_generic_truncate);
     try_hook(acct, hookmgr_hook_unimplemented);
+    try_hook(dup, hookmgr_hook_generic_dup);
+    try_hook(dup2, hookmgr_hook_generic_dup);
+    try_hook(dup3, hookmgr_hook_generic_dup);
+    try_hook(pipe, hookmgr_hook_generic_pipe);
+    try_hook(pipe2, hookmgr_hook_generic_pipe);
+    try_hook(socket, hookmgr_hook_generic_socket);
+    try_hook(socketpair, hookmgr_hook_generic_socket);
+    //try_hook(fcntl, hookmgr_hook_unimplemented);
 
     // our path resolution would break with chroots
     try_hook(pivot_root, hookmgr_hook_unimplemented);

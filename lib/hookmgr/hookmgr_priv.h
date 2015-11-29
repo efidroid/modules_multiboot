@@ -66,7 +66,28 @@ static int name(type* event, int code) { \
 typedef struct {
     dev_t dev;
     char* path;
+    int flags;
 } file_list_item_t;
+
+typedef struct {
+    int oldfd;
+    int newfd;
+    int flags;
+} hookmgr_dup_event_t;
+
+typedef struct {
+    tracy_child_addr_t pipesaddr;
+    int* pipefd;
+    int flags;
+} hookmgr_pipe_event_t;
+
+typedef struct {
+    int domain;
+    int type;
+    int protocol;
+    tracy_child_addr_t svaddr;
+    int* sv;
+} hookmgr_socket_event_t;
 
 typedef struct {
     struct tracy_ll* files;
@@ -74,6 +95,9 @@ typedef struct {
     hookmgr_close_event_t* closedata;
     hookmgr_open_event_t* opendata;
     hookmgr_open_event_t* openatdata;
+    hookmgr_dup_event_t* dupdata;
+    hookmgr_pipe_event_t* pipedata;
+    hookmgr_socket_event_t* socketdata;
 } hookmgr_child_data_t;
 
 
@@ -81,6 +105,7 @@ tracy_child_addr_t hookmgr_child_alloc(struct tracy_child * child, size_t size);
 int hookmgr_child_free(struct tracy_child * child, tracy_child_addr_t addr);
 char* strfromchild(struct tracy_child *child, tracy_child_addr_t addr);
 tracy_child_addr_t strtochild(struct tracy_child * child, const char *path);
+void* datafromchild(struct tracy_child *child, tracy_child_addr_t addr, size_t len);
 int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks);
 int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor);
 
@@ -91,6 +116,22 @@ int hookmgr_hook_openat(struct tracy_event *e);
 int hookmgr_hook_close(struct tracy_event *e);
 
 int hookmgr_hook_generic_truncate(struct tracy_event *e);
+int hookmgr_hook_generic_dup(struct tracy_event *e);
+int hookmgr_hook_generic_pipe(struct tracy_event *e);
+int hookmgr_hook_generic_socket(struct tracy_event *e);
+
+static inline file_list_item_t* fditem_dup(file_list_item_t* olditem) {
+    file_list_item_t* newitem = malloc(sizeof(file_list_item_t));
+    if(!newitem) {
+        return NULL;
+    }
+
+    newitem->dev = olditem->dev;
+    newitem->path = strdup(olditem->path);
+    newitem->flags = olditem->flags;
+
+    return newitem;
+}
 
 #endif // HOOKMGR_PRIV_H
 

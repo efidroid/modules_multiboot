@@ -70,6 +70,7 @@ typedef struct hookmgr_open_event {
 typedef struct hookmgr_close_event {
     int fd;
     const char* pathname;
+    int flags;
 
     int (*set_fd)(struct hookmgr_close_event*, int);
     int (*abort)(struct hookmgr_close_event*, int);
