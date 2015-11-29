@@ -117,6 +117,10 @@ typedef struct hookmgr_device {
         struct hookmgr_device* dev,
         hookmgr_close_event_t* event
     );
+    void (*close_post)(
+        struct hookmgr_device* dev,
+        hookmgr_close_event_t* event
+    );
     void (*truncate)(
         struct hookmgr_device* dev,
         hookmgr_truncate_event_t* event

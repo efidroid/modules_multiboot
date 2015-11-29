@@ -453,6 +453,17 @@ int hookmgr_hook_close(struct tracy_event *e) {
             if(e->args.return_code>=0) {
                 struct tracy_ll_item* item = ll_find(cdata->files, hookevent->fd);
                 if(item && item->data) {
+                    // call close_post hook
+                    file_list_item_t* fditem = item->data;
+
+                    hookmgr_device_t *entry;
+                    list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+                        if(entry->close_post && entry->major==major(fditem->dev) && entry->minor==minor(fditem->dev)) {
+                            entry->close_post(entry, hookevent);
+                            break;
+                        }
+                    }
+
                     free(item->data);
                 }
                 ll_del(cdata->files, hookevent->fd);
