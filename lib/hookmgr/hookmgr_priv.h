@@ -9,7 +9,7 @@
 
 #define set_arg(arg, val) \
 event->tracyevent->args.arg = (long)val; \
-if (tracy_modify_syscall_args(event->tracyevent->child, a.syscall, &event->tracyevent->args)) { \
+if (tracy_modify_syscall_args(event->tracyevent->child, event->tracyevent->args.syscall, &event->tracyevent->args)) { \
     EFIVARS_LOG_FATAL(-1, "Can't set syscall argument\n"); \
     return -1; \
 }
@@ -20,7 +20,6 @@ if (tracy_modify_syscall_args(event->tracyevent->child, a.syscall, &event->tracy
 #define hookmgr_str_setter(name, type, reg, field) \
 static int name (type* event, const char* str) { \
     int rc; \
-	struct tracy_sc_args a; \
 \
     tracy_child_addr_t addr = strtochild(event->tracyevent->child, str);\
     if(!addr) { \
@@ -49,7 +48,6 @@ static int name (type* event, const char* str) { \
 
 #define hookmgr_primitive_setter(name, type, reg, field, fieldtype) \
 static int name(type* event, fieldtype arg) { \
-	struct tracy_sc_args a; \
 	set_arg(reg, (long)arg); \
 \
     event->field = arg; \
