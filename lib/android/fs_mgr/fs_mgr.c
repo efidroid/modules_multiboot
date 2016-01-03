@@ -29,6 +29,8 @@
 #include <time.h>
 #include <sys/swap.h>
 #include <stdbool.h>
+#include <limits.h>
+#include <util.h>
 
 #include <linux/loop.h>
 //#include <private/android_filesystem_config.h>
@@ -522,10 +524,23 @@ struct fstab_rec* fs_mgr_esp(struct fstab *fstab)
 struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block)
 {
     int i = 0;
+    char buf[PATH_MAX];
+    char* fstype = NULL;
+    struct fstab_rec* ret = NULL;
+    int rc;
 
     if (!fstab) {
         return NULL;
     }
+
+    // build dev name
+    rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", block->devname);
+    if(rc<0) {
+        return NULL;
+    }
+
+    // get fstype
+    fstype = util_get_fstype(buf);
 
     for (i = 0; i < fstab->num_entries; i++) {
         uevent_block_t *fstab_block = get_blockinfo_for_path(multiboot_get_data()->blockinfo, fstab->recs[i].blk_device);
@@ -537,11 +552,14 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
            block->partn==fstab_block->partn &&
            !strcmp(block->devname, fstab_block->devname) &&
            !strcmp(block->partname, fstab_block->partname) &&
-           block->type==fstab_block->type)
+           block->type==fstab_block->type &&
+           (!fstype || !strcmp(fstype, fstab->recs[i].fs_type)) )
         {
-            return &fstab->recs[i];
+            ret = &fstab->recs[i];
+            break;
         }
     }
 
-    return NULL;
+    free(fstype);
+    return ret;
 }
