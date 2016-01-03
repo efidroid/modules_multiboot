@@ -11,6 +11,7 @@
 #include <lib/efivars.h>
 #include <lib/fs_mgr.h>
 #include <blkid.h>
+#include <ini.h>
 
 #include <util.h>
 #include <common.h>
@@ -20,7 +21,8 @@
 
 PAYLOAD_IMPORT(fstab_multiboot);
 PAYLOAD_IMPORT(busybox);
-static multiboot_data_t multiboot_data;
+PAYLOAD_IMPORT(mke2fs);
+static multiboot_data_t multiboot_data = {0};
 
 multiboot_data_t* multiboot_get_data(void) {
     return &multiboot_data;
@@ -50,13 +52,13 @@ static void import_kernel_nv(char *name)
         else if(!strncmp(value, "MBR", 3))
             format = "%3s,%11s,%ms";
         else {
-            LOGE("invalid format\n");
+            EFIVARS_LOG_FATAL(-1, "invalid format\n");
             return;
         }
 
         // read values
 		if ((rc=sscanf(value, format, type, guid, &path)) != 3) {
-            LOGE("%d\n", rc);
+            EFIVARS_LOG_FATAL(rc, "invalid format\n");
 			return;
 		}
 
@@ -74,24 +76,36 @@ static int device_matches(const char* path, const char* guid) {
 	blkid_tag_iterate iter;
 	const char *type, *value;
 	blkid_cache cache = NULL;
+    pid_t pid;
 
-    // get dev
-	blkid_get_cache(&cache, NULL);
-	blkid_dev dev = blkid_get_dev(cache, path, BLKID_DEV_NORMAL);
-	if(!dev) {
-		LOGV("Device %s not found\n", path);
-		return 0;
-	}
+    // libblkid uses hardcoded paths for /sys and /dev
+    // to make it work with our custom environmont (without modifying the libblkid code)
+    // we have to chroot to /multiboot
+    pid = fork();
+    if (!pid) {
+        chroot("/multiboot");
 
-    // get part uuid
-	iter = blkid_tag_iterate_begin(dev);
-	while (blkid_tag_next(iter, &type, &value) == 0) {
-        if(!strcmp(type, "PARTUUID") && !strcasecmp(value, guid)) {
-            rc = 1;
-            break;
+        // get dev
+        blkid_get_cache(&cache, NULL);
+        blkid_dev dev = blkid_get_dev(cache, path, BLKID_DEV_NORMAL);
+        if(!dev) {
+            LOGV("Device %s not found\n", path);
+            exit(0);
         }
-	}
-	blkid_tag_iterate_end(iter);
+
+        // get part uuid
+        iter = blkid_tag_iterate_begin(dev);
+        while (blkid_tag_next(iter, &type, &value) == 0) {
+            if(!strcmp(type, "PARTUUID") && !strcasecmp(value, guid)) {
+                rc = 1;
+                break;
+            }
+        }
+        blkid_tag_iterate_end(iter);
+        exit(rc);
+    } else {
+        waitpid(pid, &rc, 0);
+    }
 
 	return rc;
 }
@@ -108,8 +122,14 @@ int run_init(struct tracy *tracy)
 	// RUN
     if (tracy)
 		ret = !tracy_exec(tracy, par);
-	else
-    	ret = execve(par[0], par, NULL);
+	else {
+        // close all file handles
+        int fd;
+        for(fd=0; fd<10; fd++)
+            close(fd);
+
+        ret = execve(par[0], par, NULL);
+    }
 
 	// error check
 	if (ret) {
@@ -119,56 +139,6 @@ int run_init(struct tracy *tracy)
 
 	return 0;
 }
-
-#if 0
-int wait_for_partition(void)
-{
-    int rc;
-
-    // create epoll event
-    int efd = epoll_create1(0);
-    if(efd<0) {
-        LOGE("Can't create epoll: %s\n", strerror(errno));
-        return efd;
-    }
-
-    // mount procfs
-	mkdir(MBPATH_PROC, 0755);
-    rc = mount("proc", MBPATH_PROC, "proc", 0, NULL);
-	if(rc) {
-        LOGE("Can't mount procfs: %s\n", strerror(errno));
-        return rc;
-    }
-
-    // open mounts
-    int mountsfd = open(MBPATH_PROC"/1/mountinfo", O_RDONLY);
-    if(mountsfd<0) {
-        LOGE("Can't open mountinfo: %s\n", strerror(errno));
-        return mountsfd;
-    }
-
-    // add FD to epoll
-    struct epoll_event event;
-    event.data.fd = mountsfd;
-    event.events = EPOLLIN | EPOLLET;
-    rc = epoll_ctl(efd, EPOLL_CTL_ADD, mountsfd, &event);
-    if(rc<0) {
-        LOGE("Can't setup epoll: %s\n", strerror(errno));
-        return rc;
-    }
-
-    // poll changes
-    struct epoll_event events;
-    while (epoll_wait(efd, &events, 1, -1)>=0) {
-        LOGI("CHANGE\n");
-
-        scan_mounted_volumes();
-        dump_mounted_volumes();
-    }
-
-    return 0;
-}
-#endif
 
 static int selinux_fixup(void) {
     int rc = 0;
@@ -376,10 +346,73 @@ static void init_usr_handler(unused int sig, unused siginfo_t* info, unused void
     init_usr_interrupt = 1;
 }
 
-int multiboot_main(unused int argc, char** argv) {
-    (void)(device_matches);
+static int mbini_count_handler(unused void* user, const char* section, unused const char* name, unused const char* value) {
+    // we're interested in partitions only
+    if(strcmp(section, "partitions"))
+        return 1;
 
+    multiboot_data.num_mbparts++;
+
+    return 1;
+}
+
+static int mbini_handler(unused void* user, const char* section, const char* name, const char* value) {
+    uint32_t* index = user;
+
+    if((*index)>=multiboot_data.num_mbparts) {
+        EFIVARS_LOG_TRACE(-ENOMEM, "Too many partitions\n");
+    }
+
+    // we're interested in partitions only
+    if(strcmp(section, "partitions"))
+        return 1;
+
+    // validate args
+    if(!name || !value) {
+        EFIVARS_LOG_TRACE(-EINVAL, "Invalid argument\n");
+        return 1;
+    }
+
+    // setup partition
+    multiboot_partition_t* part = &multiboot_data.mbparts[(*index)++];
+    part->name = strdup(name);
+    part->path = strdup(value);
+    part->is_bind = 1;
+
+    // validate duplicated strings
+    if(!part->name || !part->path) {
+        EFIVARS_LOG_TRACE(-ENOMEM, "Can't duplicate strings\n");
+        return 1;
+    }
+
+    // check if it's a bind mount
+    int pathlen = strlen(part->path);
+    if(pathlen>=4 && !strcmp(part->path+pathlen-4, ".img"))
+        part->is_bind = 0;
+
+    // inih defines 1 as OK
+    return 1;
+}
+
+multiboot_partition_t* multiboot_part_by_name(const char* name) {
+    uint32_t i;
+
+    if(!multiboot_data.mbparts)
+        return NULL;
+
+    for(i=0; i<multiboot_data.num_mbparts; i++) {
+        multiboot_partition_t* part = &multiboot_data.mbparts[i];
+
+        if(!strcmp(part->name, name))
+            return part;
+    }
+
+    return NULL;
+}
+
+int multiboot_main(unused int argc, char** argv) {
     int rc = 0;
+    int i;
     char buf[PATH_MAX];
 
     // init logging
@@ -392,14 +425,14 @@ int multiboot_main(unused int argc, char** argv) {
         return rc;
     }
 
-    // mount sysfs
+    // mount private sysfs
     rc = util_mount("sysfs", MBPATH_SYS, "sysfs", 0, NULL);
 	if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
         return rc;
     }
 
-    // mount proc
+    // mount private proc
     rc = util_mount("proc", MBPATH_PROC, "proc", 0, NULL);
 	if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
@@ -414,6 +447,18 @@ int multiboot_main(unused int argc, char** argv) {
     if(!multiboot_data.blockinfo) {
         LOGE("Can't retrieve blockinfo: %s\n", strerror(errno));
         return -errno;
+    }
+
+    // mount private dev fs
+    rc = util_mount("tmpfs", MBPATH_DEV, "tmpfs", MS_NOSUID, "mode=0755");
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't mount tmpfs for dev: %s\n", strerror(errno));
+    }
+
+    // build private dev fs
+    rc = uevent_create_nodes(multiboot_data.blockinfo, MBPATH_DEV);
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't mount dev: %s\n", strerror(errno));
     }
 
     // check for hwname
@@ -437,6 +482,12 @@ int multiboot_main(unused int argc, char** argv) {
     rc = util_extractbin(PAYLOAD_PTR(busybox), MBPATH_BUSYBOX, PAYLOAD_SIZE(busybox));
     if(rc) {
         return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_BUSYBOX": %s\n", strerror(errno));
+    }
+
+    // extract mke2fs
+    rc = util_extractbin(PAYLOAD_PTR(mke2fs), MBPATH_MKE2FS, PAYLOAD_SIZE(mke2fs));
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
     }
 
     // create symlinks
@@ -479,13 +530,115 @@ int multiboot_main(unused int argc, char** argv) {
     // grant ourselves some selinux permissions :)
     selinux_fixup();
 
+    // common multiboot initialization
+    if(multiboot_data.guid!=NULL && multiboot_data.path!=NULL) {
+        multiboot_data.is_multiboot = 1;
+        LOGI("Booting from {%s}%s\n", multiboot_data.guid, multiboot_data.path);
+
+        // get boot device
+	for(i=0; i<multiboot_data.blockinfo->num_entries; i++) {
+            uevent_block_t *event = &multiboot_data.blockinfo->entries[i];
+
+            snprintf(buf, sizeof(buf), "/dev/block/%s", event->devname);
+            if(device_matches(buf, multiboot_data.guid)) {
+                multiboot_data.bootdev = event;
+                break;
+            }
+        }
+
+        if(!multiboot_data.bootdev) {
+            return EFIVARS_LOG_TRACE(-EINVAL, "Boot device not found");
+        }
+        LOGI("Boot device: %s\n", multiboot_data.bootdev->devname);
+
+        // try to use the ROM's mountflags
+        unsigned long mountflags = 0;
+        const void* data = NULL;
+        struct fstab_rec* bootdevrec = fs_mgr_get_by_ueventblock(multiboot_data.romfstab, multiboot_data.bootdev);
+        if(bootdevrec) {
+            // use the ROM's mount options for this partition
+            mountflags = bootdevrec->flags;
+            data = (void*)bootdevrec->fs_options;
+        }
+
+        // mount bootdev
+        rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, mountflags, data);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't mount boot device: %s\n", strerror(errno));
+        }
+
+        // check for bind-mount support
+        rc = scan_mounted_volumes();
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't scan mounted volumes: %s\n", strerror(errno));
+        }
+        const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data.bootdev->major, multiboot_data.bootdev->minor, 0);
+        if(!volume) {
+            return EFIVARS_LOG_TRACE(rc, "boot device not mounted (DAFUQ?)\n");
+        }
+        if(util_fs_supports_multiboot_bind(volume->filesystem)) {
+           multiboot_data.bootdev_supports_bindmount = 1;
+        }
+
+        // build multiboot.ini filename
+        rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s", multiboot_data.path);
+        if(rc<0) {
+            return EFIVARS_LOG_TRACE(rc, "Can't build multiboot.ini path: %s\n", strerror(errno));
+        }
+
+        // count partitions in multiboot.ini
+        rc = ini_parse(buf, mbini_count_handler, NULL);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't count partitions in '%s': %s\n", buf, strerror(errno));
+        }
+
+        // allocate mbparts array
+        multiboot_data.mbparts = calloc(sizeof(multiboot_partition_t), multiboot_data.num_mbparts);
+        if(!multiboot_data.mbparts) {
+            return EFIVARS_LOG_TRACE(-errno, "Can't allocate multiboot partitions array: %s\n", strerror(errno));
+        }
+
+        // parse multiboot.ini
+        uint32_t index = 0;
+        rc = ini_parse(buf, mbini_handler, &index);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't parse '%s': %s\n", buf, strerror(errno));
+        }
+
+        // verify multiboot partitions
+        for(i=0; i<multiboot_data.mbfstab->num_entries; i++) {
+            struct fstab_rec *rec;
+
+            // skip non-multiboot partitions
+            rec = &multiboot_data.mbfstab->recs[i];
+            if(!fs_mgr_is_multiboot(rec)) continue;
+
+            // get multiboot partition
+            multiboot_partition_t* part = multiboot_part_by_name(rec->mount_point+1);
+            if(!part) {
+                return EFIVARS_LOG_TRACE(-ENOENT, "Can't find multiboot partition for '%s': %s\n", rec->mount_point, strerror(errno));
+            }
+
+            // check if bind support is needed
+            if(part->is_bind && !multiboot_data.bootdev_supports_bindmount) {
+                return EFIVARS_LOG_TRACE(-1, "Boot device doesn't support bind mounts\n");
+            }
+
+            // check if bind support is needed
+            if(part->is_bind && !strcmp(rec->fs_type, "emmc")) {
+                return EFIVARS_LOG_TRACE(-1, "raw device %s doesn't support bind mounts\n", rec->blk_device);
+            }
+        }
+    }
+
     // boot recovery
     if(util_exists("/sbin/recovery", true)) {
+        LOGI("Booting recovery\n");
         return boot_recovery();
     }
 
     // boot main system
-    if(multiboot_data.guid==NULL && multiboot_data.path==NULL) {
+    if(!multiboot_data.is_multiboot) {
         LOGI("Booting main system\n");
 
         pid_t pid = fork();
@@ -538,43 +691,6 @@ int multiboot_main(unused int argc, char** argv) {
         LOGE("UNSUPPORTED\n");
         return -1;
     }
-
-    return 0;
-
-
-
-#if 0
-    LOGI("Booting from {%s}%s\n", multiboot_data.guid,multiboot_data.path);
-
-    // parse /sys/block
-    uevent_block_info_t* blockinfo = get_block_devices();
-
-    // get boot device
-    int i;
-    char buf[PATH_MAX+1];
-	for (i = 0; i < blockinfo->num_entries; i++) {
-		uevent_block_t *event = &blockinfo->entries[i];
-
-        snprintf(buf, sizeof(buf), "/dev/block/%s", event->devname);
-        if(device_matches(buf, multiboot_data.guid)) {
-            multiboot_data.bootdev = event;
-            break;
-        }
-	}
-    if(!multiboot_data.bootdev) {
-        LOGE("Boot device not found!");
-        return -EINVAL;
-    }
-
-    LOGI("Boot device: %s\n", multiboot_data.bootdev->devname);
-    scan_mounted_volumes();
-    dump_mounted_volumes();
-
-    const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data.bootdev->major, multiboot_data.bootdev->minor);
-    if(volume) {
-        LOGI("bootdev mounted at %s\n", volume->mount_point);
-    }
-#endif
 
     return rc;
 }

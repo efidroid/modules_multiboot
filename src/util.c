@@ -45,6 +45,28 @@ char* util_basename(const char* path) {
     return ret;
 }
 
+char* util_dirname(const char* path) {
+    // duplicate input path
+    char* str = strdup(path);
+    if(!str) return NULL;
+
+    // get dirname
+    char* dname = dirname(str);
+    if(!dname) {
+        free(str);
+        return NULL;
+    }
+
+    // duplicate return value
+    char* ret = strdup(dname);
+
+    // cleanup input path
+    free(str);
+
+    // return result
+    return ret;
+}
+
 int util_buf2file(const void* buf, const char* filename, size_t size) {
     int fd;
     size_t nbytes;
@@ -310,7 +332,7 @@ int util_make_loop(const char *path)
     return rc;
 }
 
-int util_losetup(char *_device, char *_file, bool ro)
+int util_losetup(const char *_device, const char *_file, bool ro)
 {
 	char *par[64];
 	int i = 0;
@@ -343,6 +365,84 @@ int util_losetup(char *_device, char *_file, bool ro)
     free(file);
 
     return rc;
+}
+
+int util_losetup_free(const char *_device)
+{
+	char *par[64];
+	int i = 0;
+    int rc;
+
+    // duplicate arguments
+    char* device = strdup(_device);
+    if(!device) return -ENOMEM;
+
+	// tool
+	par[i++] = MBPATH_BUSYBOX;
+	par[i++] = "losetup";
+
+	// disassociate
+	par[i++] = "-d";
+
+	// device
+	par[i++] = device;
+
+	// end
+	par[i++] = (char *)0;
+
+	rc = util_exec(par);
+
+    // free arguments
+    free(device);
+
+    return rc;
+}
+
+int util_mke2fs(const char *_device, const char* _fstype)
+{
+	char *par[64];
+	int i = 0;
+    int rc;
+
+    // duplicate arguments
+    char* device = strdup(_device);
+    char* fstype = strdup(_fstype);
+    if(!device || !fstype) return -ENOMEM;
+
+	// tool
+	par[i++] = MBPATH_MKE2FS;
+
+    // filesystem
+	par[i++] = "-t";
+	par[i++] = fstype;
+
+    // reserved blocks
+	par[i++] = "-m";
+	par[i++] = "0";
+
+	// force
+	par[i++] = "-F";
+
+    // device
+	par[i++] = device;
+
+	// end
+	par[i++] = (char *)0;
+
+	rc = util_exec(par);
+
+    // free arguments
+    free(fstype);
+    free(device);
+
+    return rc;
+}
+
+int util_mkfs(const char *device, const char* fstype) {
+    if(!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
+        return util_mke2fs(device, fstype);
+
+    return -1;
 }
 
 int util_block_num(const char *path, unsigned long* numblocks)
@@ -444,6 +544,35 @@ int util_cp(const char *source, const char *target)
 	free(buf_source);
 
 	return rc;
+}
+
+int util_shell(const char *_cmd)
+{
+	char *par[64];
+	int i = 0;
+    int rc;
+
+    // duplicate arguments
+    char* cmd = strdup(_cmd);
+    if(!cmd) return -ENOMEM;
+
+	// tool
+	par[i++] = MBPATH_BUSYBOX;
+	par[i++] = "sh";
+
+	// cmd
+	par[i++] = "-c";
+	par[i++] = cmd;
+
+	// end
+	par[i++] = (char *)0;
+
+	rc = util_exec(par);
+
+    // free arguments
+    free(cmd);
+
+    return rc;
 }
 
 char *util_get_fstype(const char *filename)
@@ -556,23 +685,27 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     return ret;
 }
 
-int util_create_partition_backup(const char* device, const char* file) {
+int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force) {
     int rc;
-    unsigned long num_blocks = 0;
 
     // get number of blocks
-    util_block_num(device, &num_blocks);
+    if(num_blocks==0)
+        util_block_num(device, &num_blocks);
 
     // create raw image if it doesn't exists yet 
     // or if it's size doesn't match the original partition
-    if(!util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
-        rc = util_dd(device, file, 0);
+    if(force || !util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
+        rc = util_dd(device, file, num_blocks);
         if(rc) {
             return EFIVARS_LOG_TRACE(rc, "Can't copy %s to %s\n", device, file);
         }
     }
 
     return 0;
+}
+
+int util_create_partition_backup(const char* device, const char* file) {
+    return util_create_partition_backup_ex(device, file, 0, false);
 }
 
 char* util_getmbpath_from_device(const char* device) {
@@ -595,4 +728,75 @@ char* util_getmbpath_from_device(const char* device) {
     }
 
     return strdup(buf);
+}
+
+static const char* multiboot_bind_whitelist[] = {
+    "ext2",
+    "ext3",
+    "ext4",
+    "f2fs",
+};
+
+int util_fs_supports_multiboot_bind(const char* type) {
+    uint32_t i;
+
+    for(i=0; i<ARRAY_SIZE(multiboot_bind_whitelist); i++) {
+        if(!strcmp(multiboot_bind_whitelist[i], type))
+            return 1;
+    }
+
+    return 0;
+}
+
+char* util_device_from_mbname(const char* name) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    int i;
+    int rc;
+    char buf[PATH_MAX];
+
+    for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
+        struct fstab_rec *rec = &multiboot_data->mbfstab->recs[i];
+
+        if(!strcmp(rec->mount_point+1, name)) {
+        	uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+            if (!bi) return NULL;
+
+        	rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
+            if(rc<0) return NULL;
+
+            return strdup(buf);
+        }
+    }
+
+    return NULL;
+}
+
+char* util_fd2name(pid_t pid, int fd) {
+    int rc;
+    char buf[PATH_MAX];
+    char procfile[PATH_MAX];
+
+    rc = snprintf(procfile, sizeof(procfile), "/proc/%d/fd/%d", pid, fd);
+    if(rc<0) return NULL;
+
+    ssize_t size = readlink(procfile, buf, sizeof(buf));
+    if(size<=0) return NULL;
+    if(size==sizeof(buf)) buf[size-1] = 0;
+
+    return strdup(buf);
+}
+
+multiboot_partition_t* util_mbpart_by_name(const char* name) {
+    uint32_t i;
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    for(i=0; i<multiboot_data->num_mbparts; i++) {
+        multiboot_partition_t* part = &multiboot_data->mbparts[i];
+
+        if(!strcmp(part->name, name))
+            return part;
+    }
+
+    return NULL;
 }

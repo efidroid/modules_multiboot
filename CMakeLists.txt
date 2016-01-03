@@ -5,6 +5,7 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_PAYLOADS
     ${DEVICE_FSTAB}
     ${TARGET_BUSYBOX_OUT}/busybox
+    ${TARGET_E2FSPROGS_OUT}/misc/mke2fs
 )
 set(CMAKE_PAYLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/files)
 set(CMAKE_PAYLOAD_OBJ ${CMAKE_PAYLOAD_DIR}.obj)
@@ -40,7 +41,7 @@ set_target_properties(payload PROPERTIES
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wshadow")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc -Wl,-static")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections -Wl,-gc-sections -Os")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections -Wl,-gc-sections -Os -s")
 add_definitions(-DDEVICE_NVVARS_PARTITION="${DEVICE_NVVARS_PARTITION}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMPLEFILENAME='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 
@@ -77,7 +78,7 @@ add_executable(init
     lib/hookmgr/hookmgr_io.c
     lib/lk/cksum/crc32.c
 )
-target_link_libraries(init blkid uuid sepolicy-inject tracy pthread payload)
+target_link_libraries(init blkid uuid sepolicy-inject tracy pthread inih payload)
 include_directories(
     include
     lib/android/include
