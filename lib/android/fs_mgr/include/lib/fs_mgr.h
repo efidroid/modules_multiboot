@@ -78,6 +78,7 @@ int fs_mgr_do_tmpfs_mount(char *n_name);
 int fs_mgr_unmount_all(struct fstab *fstab);
 struct fstab_rec* fs_mgr_esp(struct fstab *fstab);
 struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block);
+struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point);
 //int fs_mgr_get_crypt_info(struct fstab *fstab, char *key_loc,
 //                          char *real_blk_device, int size);
 int fs_mgr_add_entry(struct fstab *fstab,

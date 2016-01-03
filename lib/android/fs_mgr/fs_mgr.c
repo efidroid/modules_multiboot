@@ -563,3 +563,18 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
     free(fstype);
     return ret;
 }
+
+struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point) {
+    int i = 0;
+
+    if (!fstab) {
+        return NULL;
+    }
+
+    for (i = 0; i < fstab->num_entries; i++) {
+        if(!strcmp(fstab->recs[i].mount_point, mount_point))
+            return &fstab->recs[i];
+    }
+
+    return NULL;
+}
