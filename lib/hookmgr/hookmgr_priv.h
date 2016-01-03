@@ -90,6 +90,7 @@ typedef struct {
 typedef struct {
     struct tracy_ll* files;
     struct tracy_ll* allocs;
+    hookmgr_mount_event_t* mountdata;
     hookmgr_close_event_t* closedata;
     hookmgr_open_event_t* opendata;
     hookmgr_open_event_t* openatdata;

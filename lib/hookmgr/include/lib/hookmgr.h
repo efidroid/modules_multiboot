@@ -32,6 +32,8 @@ typedef struct hookmgr_mount_event {
     tracy_child_addr_t alloc_source;
     tracy_child_addr_t alloc_target;
     tracy_child_addr_t alloc_filesystemtype;
+    unsigned major;
+    unsigned minor;
 } hookmgr_mount_event_t;
 
 typedef struct hookmgr_umount_event {
@@ -102,6 +104,10 @@ typedef struct hookmgr_device {
     unsigned minor;
 
     void (*mount)(
+        struct hookmgr_device* dev,
+        hookmgr_mount_event_t* event
+    );
+    void (*mount_post)(
         struct hookmgr_device* dev,
         hookmgr_mount_event_t* event
     );

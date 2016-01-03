@@ -52,12 +52,23 @@ static int hookmgr_mount_set_data(hookmgr_mount_event_t* event, void* data, size
 
 int hookmgr_hook_mount(struct tracy_event *e) {
     hookmgr_t* mgr = mgr_from_event(e);
+    hookmgr_child_data_t *cdata = e->child->custom;
     int rc;
     int tracyrc = TRACY_HOOK_CONTINUE;
+    hookmgr_mount_event_t* hookevent = NULL;
 
     if (e->child->pre_syscall) {
-        hookmgr_mount_event_t  _hookevent = {0};
-        hookmgr_mount_event_t* hookevent = &_hookevent;
+        if(cdata->mountdata) {
+            EFIVARS_LOG_FATAL(-1, "cdata->mountdata is not empty\n");
+            return TRACY_HOOK_ABORT;
+        }
+        hookevent = calloc(sizeof(hookmgr_mount_event_t), 1);
+        if(!hookevent) {
+            EFIVARS_LOG_FATAL(-1, "can't allocate cdata\n");
+            return TRACY_HOOK_ABORT;
+        }
+
+        cdata->mountdata = hookevent;
 
         hookevent->tracyevent = e;
         hookevent->source = strfromchild(e->child, (void*)e->args.a0);
@@ -86,6 +97,9 @@ int hookmgr_hook_mount(struct tracy_event *e) {
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->source, &major, &minor, 1);
         if(!rc) {
+            hookevent->major = major;
+            hookevent->minor = minor;
+
             // call mount hook
             hookmgr_device_t *entry;
             list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
@@ -102,11 +116,38 @@ int hookmgr_hook_mount(struct tracy_event *e) {
                 tracyrc = TRACY_HOOK_DENY;
             }
         }
+    }
+
+    else {
+        hookevent = cdata->mountdata;
+        if(!hookevent) {
+            LOGW("cdata->mountdata is NULL\n");
+            return tracyrc;
+        }
+
+        if(hookevent->major && hookevent->minor) {
+            // call mount_post hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+                if(entry->mount_post && entry->major==hookevent->major && entry->minor==hookevent->minor) {
+                    entry->mount_post(entry, hookevent);
+                    break;
+                }
+            }
+
+            // check if we were requested to abort the syscall
+            if(hookevent->do_abort) {
+                e->child->return_code = hookevent->returncode;
+                e->child->change_return_code = 1;
+            }
+        }
 
         // cleanup
         free((void*)hookevent->filesystemtype);
         free((void*)hookevent->target);
         free((void*)hookevent->source);
+        free(hookevent);
+        cdata->mountdata = NULL;
     }
 
     return tracyrc;
