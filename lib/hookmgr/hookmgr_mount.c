@@ -67,8 +67,8 @@ int hookmgr_hook_mount(struct tracy_event *e) {
         hookevent->data = (tracy_child_addr_t)e->args.a4;
 
         if( (e->args.a0 && !hookevent->source)
-         || (e->args.a1 && !hookevent->target)
-         || (e->args.a2 && !hookevent->filesystemtype))
+                || (e->args.a1 && !hookevent->target)
+                || (e->args.a2 && !hookevent->filesystemtype))
         {
             EFIVARS_LOG_FATAL(-1, "Can't receive arguments\n");
             return TRACY_HOOK_ABORT;
@@ -86,14 +86,14 @@ int hookmgr_hook_mount(struct tracy_event *e) {
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->source, &major, &minor, 1);
         if(!rc) {
-	        // call mount hook
-	        hookmgr_device_t *entry;
-	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+            // call mount hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
                 if(entry->mount && entry->major==major && entry->minor==minor) {
                     entry->mount(entry, hookevent);
                     break;
                 }
-	        }
+            }
 
             // check if we were requested to abort the syscall
             if(hookevent->do_abort) {
@@ -143,14 +143,14 @@ int hookmgr_hook_umount(struct tracy_event *e) {
         // ignore devices we can't find
         rc = lindev_from_mountpoint(hookevent->target, &major, &minor);
         if(!rc) {
-	        // call umount hook
-	        hookmgr_device_t *entry;
-	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+            // call umount hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
                 if(entry->umount && entry->major==major && entry->minor==minor) {
                     entry->umount(entry, hookevent);
                     break;
                 }
-	        }
+            }
 
             // check if we were requested to abort the syscall
             if(hookevent->do_abort) {

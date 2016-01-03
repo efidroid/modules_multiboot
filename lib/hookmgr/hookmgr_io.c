@@ -65,10 +65,10 @@ static int child_sys_getcwd(struct tracy_child *child, char* buf, size_t size) {
     }
 
     // copy buffer from child
-	rc =tracy_read_mem(child, buf, childbuf, size);
+    rc =tracy_read_mem(child, buf, childbuf, size);
     if(rc<0) {
-		return rc;
-	}
+        return rc;
+    }
 
 out:
     // free child buffer
@@ -139,9 +139,9 @@ int hookmgr_hook_open(struct tracy_event *e) {
         if(!rc) {
             hookevent->dev = makedev(major, minor);
 
-	        // call open hook
-	        hookmgr_device_t *entry;
-	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+            // call open hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
                 if(entry->open && entry->major==major && entry->minor==minor) {
                     entry->open(entry, hookevent);
 
@@ -153,10 +153,10 @@ int hookmgr_hook_open(struct tracy_event *e) {
 
                         break;
                     }
-                    
+
                     break;
                 }
-	        }
+            }
         }
     }
 
@@ -253,7 +253,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                 int trailingslash = 0;
                 if(cwdlen>0 && cwd[cwdlen-1]=='/')
                     trailingslash = 1;
-                
+
                 rc = snprintf(buf, sizeof(buf), "%s%s%s", cwd, (trailingslash?"":"/"), pathnameptr);
                 if(rc<0) {
                     EFIVARS_LOG_FATAL(-1, "Can't build new path\n");
@@ -300,9 +300,9 @@ int hookmgr_hook_openat(struct tracy_event *e) {
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
         if(!rc) {
-	        // call open hook
-	        hookmgr_device_t *entry;
-	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+            // call open hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
                 hookevent->dev = makedev(major, minor);
 
                 if(entry->open && entry->major==major && entry->minor==minor) {
@@ -331,7 +331,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                         EFIVARS_LOG_FATAL(rc, "Can't inject open() syscall\n");
                         return TRACY_HOOK_ABORT;
                     }
-                    
+
                     // suppress openat() syscall and return the result of open()
                     e->child->return_code = ret;
                     e->child->change_return_code = 1;
@@ -351,10 +351,10 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                         item->flags = hookevent->flags;
                         ll_add(cdata->files, e->child->return_code, item);
                     }
-                    
+
                     break;
                 }
-	        }
+            }
         }
     }
 
@@ -510,13 +510,13 @@ int hookmgr_hook_generic_truncate(struct tracy_event *e) {
         hookevent->abort = hookmgr_generic_truncate_abort;
 
         unsigned major, minor;
-        
+
         // ignore devices we can't find
         rc = lindev_from_path(hookevent->pathname, &major, &minor, 1);
         if(!rc) {
-	        // call truncate hook
-	        hookmgr_device_t *entry;
-	        list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
+            // call truncate hook
+            hookmgr_device_t *entry;
+            list_for_every_entry(&mgr->devices, entry, hookmgr_device_t, node) {
                 if(entry->truncate && entry->major==major && entry->minor==minor) {
                     entry->truncate(entry, hookevent);
 
@@ -528,10 +528,10 @@ int hookmgr_hook_generic_truncate(struct tracy_event *e) {
 
                         break;
                     }
-                    
+
                     break;
                 }
-	        }
+            }
         }
 
         // cleanup

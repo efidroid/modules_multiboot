@@ -30,18 +30,18 @@ multiboot_data_t* multiboot_get_data(void) {
 
 static void import_kernel_nv(char *name)
 {
-	char *value = strchr(name, '=');
-	int name_len = strlen(name);
-	int rc;
+    char *value = strchr(name, '=');
+    int name_len = strlen(name);
+    int rc;
 
-	if (value == 0)
-		return;
-	*value++ = 0;
-	if (name_len == 0)
-		return;
+    if (value == 0)
+        return;
+    *value++ = 0;
+    if (name_len == 0)
+        return;
 
-	if (!strcmp(name, "multibootpath")) {
-		char type[4];
+    if (!strcmp(name, "multibootpath")) {
+        char type[4];
         char guid[37];
         char *path = NULL;
 
@@ -57,25 +57,25 @@ static void import_kernel_nv(char *name)
         }
 
         // read values
-		if ((rc=sscanf(value, format, type, guid, &path)) != 3) {
+        if ((rc=sscanf(value, format, type, guid, &path)) != 3) {
             EFIVARS_LOG_FATAL(rc, "invalid format\n");
-			return;
-		}
+            return;
+        }
 
         multiboot_data.guid = strdup(guid);
         multiboot_data.path = path;
-	}
+    }
 
-	else if (!strcmp(name, "androidboot.hardware")) {
+    else if (!strcmp(name, "androidboot.hardware")) {
         multiboot_data.hwname = strdup(value);
     }
 }
 
 static int device_matches(const char* path, const char* guid) {
     int rc = 0;
-	blkid_tag_iterate iter;
-	const char *type, *value;
-	blkid_cache cache = NULL;
+    blkid_tag_iterate iter;
+    const char *type, *value;
+    blkid_cache cache = NULL;
     pid_t pid;
 
     // libblkid uses hardcoded paths for /sys and /dev
@@ -107,22 +107,22 @@ static int device_matches(const char* path, const char* guid) {
         waitpid(pid, &rc, 0);
     }
 
-	return rc;
+    return rc;
 }
 
 int run_init(struct tracy *tracy)
 {
-	char *par[2];
-	int i = 0, ret = 0;
+    char *par[2];
+    int i = 0, ret = 0;
 
-	// build args
-	par[i++] = "/init";
-	par[i++] = (char *)0;
+    // build args
+    par[i++] = "/init";
+    par[i++] = (char *)0;
 
-	// RUN
+    // RUN
     if (tracy)
-		ret = !tracy_exec(tracy, par);
-	else {
+        ret = !tracy_exec(tracy, par);
+    else {
         // close all file handles
         int fd;
         for(fd=0; fd<10; fd++)
@@ -131,13 +131,13 @@ int run_init(struct tracy *tracy)
         ret = execve(par[0], par, NULL);
     }
 
-	// error check
-	if (ret) {
-		LOGE("Can't start %s: %s\n", par[0], strerror(errno));
-		return ret;
-	}
+    // error check
+    if (ret) {
+        LOGE("Can't start %s: %s\n", par[0], strerror(errno));
+        return ret;
+    }
 
-	return 0;
+    return 0;
 }
 
 static int selinux_fixup(void) {
@@ -177,15 +177,15 @@ static int selinux_fixup(void) {
 
     // give our files some selinux context
     util_append_string_to_file("/file_contexts", "\n\n"
-        "/multiboot(/.*)?             u:object_r:rootfs:s0\n"
-        "/multiboot/bin(/.*)?         u:object_r:rootfs:s0\n"
+                               "/multiboot(/.*)?             u:object_r:rootfs:s0\n"
+                               "/multiboot/bin(/.*)?         u:object_r:rootfs:s0\n"
 
-        // prevent restorecon_recursive on multiboot directories
-        "/data/media/multiboot(/.*)?          <<none>>\n"
-        "/data/media/0/multiboot(/.*)?        <<none>>\n"
-        "/realdata/media/multiboot(/.*)?      <<none>>\n"
-        "/realdata/media/0/multiboot(/.*)?    <<none>>\n"
-    );
+                               // prevent restorecon_recursive on multiboot directories
+                               "/data/media/multiboot(/.*)?          <<none>>\n"
+                               "/data/media/0/multiboot(/.*)?        <<none>>\n"
+                               "/realdata/media/multiboot(/.*)?      <<none>>\n"
+                               "/realdata/media/0/multiboot(/.*)?    <<none>>\n"
+                              );
 
     return rc;
 }
@@ -231,7 +231,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
         rc = -EINVAL;
         goto finish;
     }
-    
+
     // build UEFIESP mountpoint
     rc = snprintf(buf, PATH_MAX, "%s/%s/UEFIESP", volume->mount_point, espdir);
     if(rc<0) {
@@ -255,7 +255,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
             goto finish;
         }
     }
-    
+
     for(i=0; i<multiboot_data.mbfstab->num_entries; i++) {
         struct fstab_rec *rec;
 
@@ -290,7 +290,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
             goto finish;
         }
 
-        // create raw image if it doesn't exists yet 
+        // create raw image if it doesn't exists yet
         // or if it's size doesn't match the original partition
         if(!util_exists(buf2, false) || util_filesize(buf2, false)!=num_blocks*512llu) {
             rc = util_dd(blk_device, buf2, 0);
@@ -427,14 +427,14 @@ int multiboot_main(unused int argc, char** argv) {
 
     // mount private sysfs
     rc = util_mount("sysfs", MBPATH_SYS, "sysfs", 0, NULL);
-	if(rc) {
+    if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
         return rc;
     }
 
     // mount private proc
     rc = util_mount("proc", MBPATH_PROC, "proc", 0, NULL);
-	if(rc) {
+    if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
         return rc;
     }
@@ -536,7 +536,7 @@ int multiboot_main(unused int argc, char** argv) {
         LOGI("Booting from {%s}%s\n", multiboot_data.guid, multiboot_data.path);
 
         // get boot device
-	for(i=0; i<multiboot_data.blockinfo->num_entries; i++) {
+        for(i=0; i<multiboot_data.blockinfo->num_entries; i++) {
             uevent_block_t *event = &multiboot_data.blockinfo->entries[i];
 
             snprintf(buf, sizeof(buf), "/dev/block/%s", event->devname);
@@ -577,7 +577,7 @@ int multiboot_main(unused int argc, char** argv) {
             return EFIVARS_LOG_TRACE(rc, "boot device not mounted (DAFUQ?)\n");
         }
         if(util_fs_supports_multiboot_bind(volume->filesystem)) {
-           multiboot_data.bootdev_supports_bindmount = 1;
+            multiboot_data.bootdev_supports_bindmount = 1;
         }
 
         // build multiboot.ini filename
@@ -661,17 +661,17 @@ int multiboot_main(unused int argc, char** argv) {
         else {
             // add post-fs-data event
             snprintf(buf, PATH_MAX, "\n\n"
-                "on post-fs-data\n"
-                "    start mbpostfs\n"
-                "    wait "POSTFS_NOTIFICATION_FILE"\n"
-                "\n"
-                "service mbpostfs "MBPATH_TRIGGER_POSTFS_DATA" %u\n"
-                "    disabled\n"
-                "    oneshot\n"
-                "\n", 
+                     "on post-fs-data\n"
+                     "    start mbpostfs\n"
+                     "    wait "POSTFS_NOTIFICATION_FILE"\n"
+                     "\n"
+                     "service mbpostfs "MBPATH_TRIGGER_POSTFS_DATA" %u\n"
+                     "    disabled\n"
+                     "    oneshot\n"
+                     "\n",
 
-                getpid()
-            );
+                     getpid()
+                    );
             rc = util_append_string_to_file("/init.rc", buf);
             if(rc) return rc;
 

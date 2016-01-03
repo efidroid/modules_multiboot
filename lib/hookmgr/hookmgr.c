@@ -54,22 +54,22 @@ if (rc) { \
  */
 static int get_process_parent_id(const pid_t pid, pid_t * ppid) {
     int rc = -1;
-	char buffer[BUFSIZ];
-	sprintf(buffer, "/proc/%d/stat", pid);
-	FILE* fp = fopen(buffer, "r");
-	if (fp) {
-		size_t size = fread(buffer, sizeof (char), sizeof (buffer), fp);
-		if (size > 0) {
-			// See: http://man7.org/linux/man-pages/man5/proc.5.html section /proc/[pid]/stat
-			strtok(buffer, " "); // (1) pid  %d
-			strtok(NULL, " "); // (2) comm  %s
-			strtok(NULL, " "); // (3) state  %c
-			char * s_ppid = strtok(NULL, " "); // (4) ppid  %d
-			*ppid = atoi(s_ppid);
+    char buffer[BUFSIZ];
+    sprintf(buffer, "/proc/%d/stat", pid);
+    FILE* fp = fopen(buffer, "r");
+    if (fp) {
+        size_t size = fread(buffer, sizeof (char), sizeof (buffer), fp);
+        if (size > 0) {
+            // See: http://man7.org/linux/man-pages/man5/proc.5.html section /proc/[pid]/stat
+            strtok(buffer, " "); // (1) pid  %d
+            strtok(NULL, " "); // (2) comm  %s
+            strtok(NULL, " "); // (3) state  %c
+            char * s_ppid = strtok(NULL, " "); // (4) ppid  %d
+            *ppid = atoi(s_ppid);
             rc = 0;
-		}
-		fclose(fp);
-	}
+        }
+        fclose(fp);
+    }
 
     return rc;
 }
@@ -77,28 +77,28 @@ static int get_process_parent_id(const pid_t pid, pid_t * ppid) {
 
 tracy_child_addr_t hookmgr_child_alloc(struct tracy_child * child, size_t size)
 {
-	long rc;
-	tracy_child_addr_t addr = NULL;
+    long rc;
+    tracy_child_addr_t addr = NULL;
     hookmgr_child_data_t *cdata = child->custom;
 
-	// allocate memory for new devname
-	rc = tracy_mmap(child, &addr, NULL, size,
-			PROT_READ | PROT_WRITE,
-			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (rc < 0 || !addr) {
+    // allocate memory for new devname
+    rc = tracy_mmap(child, &addr, NULL, size,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (rc < 0 || !addr) {
         EFIVARS_LOG_TRACE(rc, "Can't allocate child memory\n");
-		return NULL;
-	}
+        return NULL;
+    }
 
     ll_add(cdata->allocs, (int)addr, (void*)size);
 
-	return addr;
+    return addr;
 }
 
 int hookmgr_child_free(struct tracy_child * child, tracy_child_addr_t addr)
 {
     int rc;
-	long ret;
+    long ret;
     hookmgr_child_data_t *cdata = child->custom;
 
     struct tracy_ll_item* item = ll_find(cdata->allocs, (int)addr);
@@ -122,68 +122,68 @@ int hookmgr_child_free(struct tracy_child * child, tracy_child_addr_t addr)
 
 char* strfromchild(struct tracy_child *child, tracy_child_addr_t addr)
 {
-	static const int len = PATH_MAX;
-	char buf[PATH_MAX];
+    static const int len = PATH_MAX;
+    char buf[PATH_MAX];
     int rc;
 
     if(!addr)
         return NULL;
 
-	// read string
-	memset(buf, 0, len);
+    // read string
+    memset(buf, 0, len);
     rc = tracy_read_mem(child, buf, addr, len);
-	if (rc < 0) {
+    if (rc < 0) {
         EFIVARS_LOG_TRACE(rc, "tracy_read_mem returned an error\n");
-		return NULL;
-	}
+        return NULL;
+    }
 
-	return strdup(buf);
+    return strdup(buf);
 }
 
 tracy_child_addr_t strtochild(struct tracy_child * child, const char *path)
 {
-	long rc;
-	int len;
-	tracy_child_addr_t path_new = NULL;
+    long rc;
+    int len;
+    tracy_child_addr_t path_new = NULL;
     hookmgr_child_data_t *cdata = child->custom;
 
     if(!path)
         return NULL;
 
     len = strlen(path) + 1;
-	if (len > PATH_MAX + 1) {
-		EFIVARS_LOG_TRACE(-EINVAL, "path exceeds maximum length\n");
-		goto err;
-	}
+    if (len > PATH_MAX + 1) {
+        EFIVARS_LOG_TRACE(-EINVAL, "path exceeds maximum length\n");
+        goto err;
+    }
 
-	// allocate memory for new devname
-	rc = tracy_mmap(child, &path_new, NULL, len,
-			PROT_READ | PROT_WRITE,
-			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (rc < 0 || !path_new) {
+    // allocate memory for new devname
+    rc = tracy_mmap(child, &path_new, NULL, len,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (rc < 0 || !path_new) {
         EFIVARS_LOG_TRACE(rc, "Can't allocate child memory\n");
-		goto err;
-	}
-	// copy new devname
-	rc = tracy_write_mem(child, path_new, (char*)path, (size_t)len);
-	if (rc < 0) {
+        goto err;
+    }
+    // copy new devname
+    rc = tracy_write_mem(child, path_new, (char*)path, (size_t)len);
+    if (rc < 0) {
         EFIVARS_LOG_TRACE(rc, "Can't copy memory to child\n");
-		goto err_munmap;
-	}
+        goto err_munmap;
+    }
 
     ll_add(cdata->allocs, (int)path_new, (void*)len);
 
-	return path_new;
+    return path_new;
 
 err_munmap:
-	tracy_munmap(child, &rc, path_new, len);
+    tracy_munmap(child, &rc, path_new, len);
 err:
-	return NULL;
+    return NULL;
 }
 
 void* datafromchild(struct tracy_child *child, tracy_child_addr_t addr, size_t len)
 {
-	void* buf = NULL;
+    void* buf = NULL;
     int rc;
 
     if(!addr)
@@ -192,18 +192,18 @@ void* datafromchild(struct tracy_child *child, tracy_child_addr_t addr, size_t l
     buf = malloc(len);
     if(!buf) {
         EFIVARS_LOG_TRACE(-errno, "Can't allocate buffer\n");
-		return NULL;
+        return NULL;
     }
 
-	// read string
+    // read string
     rc = tracy_read_mem(child, buf, addr, len);
-	if (rc < 0) {
+    if (rc < 0) {
         free(buf);
         EFIVARS_LOG_TRACE(rc, "tracy_read_mem returned an error\n");
-		return NULL;
-	}
+        return NULL;
+    }
 
-	return buf;
+    return buf;
 }
 
 int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks) {
@@ -254,34 +254,34 @@ static struct tracy_child* tracy_get_child(struct tracy* t, pid_t pid) {
 
 static void hookmgr_child_create(struct tracy_child *child)
 {
-	if (child->custom) {
-		EFIVARS_LOG_TRACE(errno, "child is initialized already\n");
+    if (child->custom) {
+        EFIVARS_LOG_TRACE(errno, "child is initialized already\n");
         tracy_quit(child->tracy, errno);
         return;
     }
 
-	// allocate
-	child->custom = malloc(sizeof(hookmgr_child_data_t));
-	if (!child->custom) {
-		EFIVARS_LOG_TRACE(errno, "can't allocate custom child mem\n");
+    // allocate
+    child->custom = malloc(sizeof(hookmgr_child_data_t));
+    if (!child->custom) {
+        EFIVARS_LOG_TRACE(errno, "can't allocate custom child mem\n");
         tracy_quit(child->tracy, errno);
         return;
-	}
+    }
 
-	// initialize
-	hookmgr_child_data_t *cdata = child->custom;
-	memset(cdata, 0, sizeof(*cdata));
+    // initialize
+    hookmgr_child_data_t *cdata = child->custom;
+    memset(cdata, 0, sizeof(*cdata));
 
     cdata->files = ll_init();
     if(!cdata->files) {
-		EFIVARS_LOG_TRACE(errno, "can't allocate list for files\n");
+        EFIVARS_LOG_TRACE(errno, "can't allocate list for files\n");
         tracy_quit(child->tracy, errno);
         return;
     }
 
     cdata->allocs = ll_init();
     if(!cdata->files) {
-		EFIVARS_LOG_TRACE(errno, "can't allocate list for allocations\n");
+        EFIVARS_LOG_TRACE(errno, "can't allocate list for allocations\n");
         tracy_quit(child->tracy, errno);
         return;
     }
@@ -290,19 +290,19 @@ static void hookmgr_child_create(struct tracy_child *child)
         pid_t ppid;
         int rc = get_process_parent_id(child->pid, &ppid);
         if(rc) {
-		    EFIVARS_LOG_TRACE(errno, "can't get parent process\n");
+            EFIVARS_LOG_TRACE(errno, "can't get parent process\n");
             tracy_quit(child->tracy, errno);
             return;
         }
 
         struct tracy_child* pchild = tracy_get_child(child->tracy, ppid);
         if(!pchild) {
-		    EFIVARS_LOG_TRACE(errno, "can't get parent tracy child\n");
+            EFIVARS_LOG_TRACE(errno, "can't get parent tracy child\n");
             tracy_quit(child->tracy, errno);
             return;
         }
 
-	    hookmgr_child_data_t *pcdata = pchild->custom;
+        hookmgr_child_data_t *pcdata = pchild->custom;
 
         // transfer all fd's
         struct tracy_ll_item *t;
@@ -322,13 +322,13 @@ static void hookmgr_child_create(struct tracy_child *child)
 
 static void hookmgr_child_destroy(struct tracy_child *child)
 {
-	if (!child->custom) {
-		EFIVARS_LOG_TRACE(errno, "child is not initialized\n");
+    if (!child->custom) {
+        EFIVARS_LOG_TRACE(errno, "child is not initialized\n");
         tracy_quit(child->tracy, errno);
         return;
     }
 
-	hookmgr_child_data_t *cdata = child->custom;
+    hookmgr_child_data_t *cdata = child->custom;
 
     // free all filenames
     struct tracy_ll_item *t;
@@ -340,9 +340,9 @@ static void hookmgr_child_destroy(struct tracy_child *child)
     free(cdata->allocs);
     free(cdata->files);
 
-	// free child data
-	free(cdata);
-	child->custom = NULL;
+    // free child data
+    free(cdata);
+    child->custom = NULL;
 }
 
 static int hookmgr_hook_unimplemented(struct tracy_event* e) {

@@ -92,7 +92,7 @@ static char* efivar_getdev(void) {
     multiboot_data_t* mbdata = multiboot_get_data();
     if(!mbdata || !mbdata->blockinfo) goto err;
 
-    // get block of our partition    
+    // get block of our partition
     uevent_block_t* bi = get_blockinfo_for_path(mbdata->blockinfo, DEVICE_NVVARS_PARTITION);
     if(!bi) goto err;
 
@@ -110,9 +110,9 @@ static char* efivar_getdev(void) {
     // try to create /efivardev
     if(!mknod(EFIVARDEV, S_IRUSR | S_IWUSR | S_IFBLK, makedev(bi->major, bi->minor))) {
         return strdup(EFIVARDEV);
-	}
+    }
 
-    // give up    
+    // give up
     LOGE("Can't find efivars partition\n");
 
 err:
@@ -277,7 +277,7 @@ static int efivar_iterate(const void* buf, uint32_t bufsize, efivar_callback_t c
 }
 
 static int efivar_append(void** buf, const uint16_t* name, const uint32_t namesize, const void* data,
-                                 const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
+                         const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
 {
     uint8_t* bufptr = *buf;
 
@@ -311,12 +311,12 @@ static int efivar_append(void** buf, const uint16_t* name, const uint32_t namesi
 }
 
 static int efivar_setvar_cb(void* _pdata, const uint16_t* name, const uint32_t namesize, const void* data,
-                                 const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
+                            const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
 {
     efivar_pdata_t* pdata = _pdata;
 
     if(pdata->namesize==namesize && !memcmp(pdata->name, name, namesize) &&
-       !memcmp(&pdata->guid, &guid, sizeof(guid)))
+            !memcmp(&pdata->guid, &guid, sizeof(guid)))
     {
         free(pdata->name);
         pdata->name = (uint16_t*)name;
@@ -398,11 +398,11 @@ int efivar_set(const char* name, efi_guid_t* guid,
 
     // allocate new buffer
     void* newdata = calloc(
-        sizeof(efivar_hdr_t) + 
-        rawdatasize +
-        EFIVAR_ENTRY_SIZE(name, datasize),
-        1
-    );
+                        sizeof(efivar_hdr_t) +
+                        rawdatasize +
+                        EFIVAR_ENTRY_SIZE(name, datasize),
+                        1
+                    );
     if(!newdata) {
         LOGE("Error allocating new buffer\n");
         return rc;
@@ -439,7 +439,7 @@ int efivar_set(const char* name, efi_guid_t* guid,
 
 int efivar_get_global(const char* name, uint32_t* datasize, void* data) {
     efi_guid_t guid = EFI_GLOBAL_VARIABLE;
-    return efivar_get(name, &guid, NULL, datasize, data);    
+    return efivar_get(name, &guid, NULL, datasize, data);
 }
 
 int efivar_set_global(const char* name, uint32_t datasize, const void* data) {
@@ -449,7 +449,7 @@ int efivar_set_global(const char* name, uint32_t datasize, const void* data) {
 
 int efivar_get_efidroid(const char* name, uint32_t* datasize, void* data) {
     efi_guid_t guid = EFI_EFIDROID_VARIABLE;
-    return efivar_get(name, &guid, NULL, datasize, data);    
+    return efivar_get(name, &guid, NULL, datasize, data);
 }
 
 int efivar_set_efidroid(const char* name, uint32_t datasize, const void* data) {
@@ -517,13 +517,13 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
         strcat(errorbuf, p);
         errorbuf_len = newlen;
     }
-     
+
     free(p);
 
     // write errors to efivars and reboot system
     if(fatal) {
         LOGE(
-                       "FATAL ERROR - LOG TRACE:\n"
+            "FATAL ERROR - LOG TRACE:\n"
             "===================================\n"
             "%s"
             "===================================\n"

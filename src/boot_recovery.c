@@ -208,7 +208,7 @@ int boot_recovery(void) {
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
     struct tracy *tracy;
-	long tracy_opt = 0;
+    long tracy_opt = 0;
 
     // initialize tracy
     tracy_opt |= TRACY_TRACE_CHILDREN;
@@ -253,7 +253,7 @@ int boot_recovery(void) {
             if(!partpath) {
                 return EFIVARS_LOG_TRACE(-1, "Can't duplicate path for partition '%s'\n", part->name);
             }
-            
+
             // stat path
             struct stat sb;
             rc = lstat(partpath, &sb);
@@ -264,10 +264,10 @@ int boot_recovery(void) {
 
             // check node type
             if(!rc && (
-                (part->is_bind && !S_ISDIR(sb.st_mode)) || 
-                (!part->is_bind && !S_ISREG(sb.st_mode))
-                )
-            ) {
+                        (part->is_bind && !S_ISDIR(sb.st_mode)) ||
+                        (!part->is_bind && !S_ISREG(sb.st_mode))
+                    )
+              ) {
                 return EFIVARS_LOG_TRACE(-1, "path '%s' has invalid type\n", partpath);
             }
 
@@ -539,11 +539,11 @@ int boot_recovery(void) {
         return EFIVARS_LOG_TRACE(rc, "Can't trace init: %s\n", strerror(errno));
     }
 
-	// main event-loop
-	tracy_main(tracy);
+    // main event-loop
+    tracy_main(tracy);
 
-	// cleanup
-	tracy_free(tracy);
+    // cleanup
+    tracy_free(tracy);
 
     return EFIVARS_LOG_TRACE(-1, "tracy returned\n");
 }

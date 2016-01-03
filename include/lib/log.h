@@ -18,8 +18,7 @@ void log_init(void);
 int  log_get_level(void);
 void log_set_level(int level);
 void log_close(void);
-void log_write(int level, const char *fmt, ...)
-    __attribute__ ((format(printf, 2, 3)));
+void log_write(int level, const char *fmt, ...) __attribute__ ((format(printf, 2, 3)));
 void log_vwrite(int level, const char *fmt, va_list ap);
 
 __END_DECLS
@@ -35,9 +34,9 @@ __END_DECLS
 #define STR(x) STR_HELPER(x)
 
 #if LOG_SHOW_CODELINE
-    #define LOG_TAG_STR(tag) tag " (" __FILE__ ":" STR(__LINE__) ")"
+#define LOG_TAG_STR(tag) tag " (" __FILE__ ":" STR(__LINE__) ")"
 #else
-    #define LOG_TAG_STR(tag) tag
+#define LOG_TAG_STR(tag) tag
 #endif
 
 #define LOGV(x...) log_write(LOGV_LEVEL, "V/" LOG_TAG_STR(LOG_TAG) ": " x)

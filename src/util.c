@@ -168,29 +168,29 @@ int util_mkdir(const char *dir) {
 
 int util_exec(char **args)
 {
-	pid_t pid;
-	int status = 0;
+    pid_t pid;
+    int status = 0;
 
-	pid = fork();
-	if (!pid) {
+    pid = fork();
+    if (!pid) {
         // redirect stdout and stderr to kmsg
         int fd = klog_get_fd();
         dup2(fd, 1);
         dup2(fd, 2);
 
-		execve(args[0], args, NULL);
-		exit(0);
-	} else {
-		waitpid(pid, &status, 0);
-	}
+        execve(args[0], args, NULL);
+        exit(0);
+    } else {
+        waitpid(pid, &status, 0);
+    }
 
-	return status;
+    return status;
 }
 
 int util_replace(const char *_file, const char *_regex)
 {
-	char *par[64];
-	int i = 0;
+    char *par[64];
+    int i = 0;
     int rc;
 
     // duplicate arguments
@@ -198,17 +198,17 @@ int util_replace(const char *_file, const char *_regex)
     char* regex = strdup(_regex);
     if(!file || !regex) return -ENOMEM;
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "sed";
-	par[i++] = "-i";
-	par[i++] = (char *)regex;
-	par[i++] = (char *)file;
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "sed";
+    par[i++] = "-i";
+    par[i++] = (char *)regex;
+    par[i++] = (char *)file;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	rc = util_exec(par);
+    rc = util_exec(par);
 
     // free arguments
     free(file);
@@ -285,8 +285,8 @@ int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *)) {
 }
 
 int util_mount(const char *source, const char *target,
-              const char *filesystemtype, unsigned long mountflags,
-              const void *data)
+               const char *filesystemtype, unsigned long mountflags,
+               const void *data)
 {
     int rc = 0;
     char* util_fstype = NULL;
@@ -316,26 +316,26 @@ int util_mount(const char *source, const char *target,
 
 int util_make_loop(const char *path)
 {
-	static int loops_created = 0;
-	int minor = 255 - loops_created;
+    static int loops_created = 0;
+    int minor = 255 - loops_created;
     int rc;
 
     // create node
     rc = mknod(path, S_IRUSR | S_IWUSR | S_IFBLK, makedev(7, minor));
-	if (rc) {
-		return rc;
-	}
+    if (rc) {
+        return rc;
+    }
 
     // increase count
-	loops_created++;
+    loops_created++;
 
     return rc;
 }
 
 int util_losetup(const char *_device, const char *_file, bool ro)
 {
-	char *par[64];
-	int i = 0;
+    char *par[64];
+    int i = 0;
     int rc;
 
     // duplicate arguments
@@ -343,22 +343,22 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     char* file = strdup(_file);
     if(!device || !file) return -ENOMEM;
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "losetup";
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "losetup";
 
-	// access mode
-	if (ro)
-		par[i++] = "-r";
+    // access mode
+    if (ro)
+        par[i++] = "-r";
 
-	// paths
-	par[i++] = device;
-	par[i++] = file;
+    // paths
+    par[i++] = device;
+    par[i++] = file;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	rc = util_exec(par);
+    rc = util_exec(par);
 
     // free arguments
     free(device);
@@ -369,28 +369,28 @@ int util_losetup(const char *_device, const char *_file, bool ro)
 
 int util_losetup_free(const char *_device)
 {
-	char *par[64];
-	int i = 0;
+    char *par[64];
+    int i = 0;
     int rc;
 
     // duplicate arguments
     char* device = strdup(_device);
     if(!device) return -ENOMEM;
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "losetup";
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "losetup";
 
-	// disassociate
-	par[i++] = "-d";
+    // disassociate
+    par[i++] = "-d";
 
-	// device
-	par[i++] = device;
+    // device
+    par[i++] = device;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	rc = util_exec(par);
+    rc = util_exec(par);
 
     // free arguments
     free(device);
@@ -400,8 +400,8 @@ int util_losetup_free(const char *_device)
 
 int util_mke2fs(const char *_device, const char* _fstype)
 {
-	char *par[64];
-	int i = 0;
+    char *par[64];
+    int i = 0;
     int rc;
 
     // duplicate arguments
@@ -409,27 +409,27 @@ int util_mke2fs(const char *_device, const char* _fstype)
     char* fstype = strdup(_fstype);
     if(!device || !fstype) return -ENOMEM;
 
-	// tool
-	par[i++] = MBPATH_MKE2FS;
+    // tool
+    par[i++] = MBPATH_MKE2FS;
 
     // filesystem
-	par[i++] = "-t";
-	par[i++] = fstype;
+    par[i++] = "-t";
+    par[i++] = fstype;
 
     // reserved blocks
-	par[i++] = "-m";
-	par[i++] = "0";
+    par[i++] = "-m";
+    par[i++] = "0";
 
-	// force
-	par[i++] = "-F";
+    // force
+    par[i++] = "-F";
 
     // device
-	par[i++] = device;
+    par[i++] = device;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	rc = util_exec(par);
+    rc = util_exec(par);
 
     // free arguments
     free(fstype);
@@ -447,127 +447,127 @@ int util_mkfs(const char *device, const char* fstype) {
 
 int util_block_num(const char *path, unsigned long* numblocks)
 {
-	int fd;
+    int fd;
 
-	fd = open(path, O_RDONLY);
-	if (fd<0)
-		return fd;
+    fd = open(path, O_RDONLY);
+    if (fd<0)
+        return fd;
 
-	if (ioctl(fd, BLKGETSIZE, numblocks) == -1)
-		return -1;
+    if (ioctl(fd, BLKGETSIZE, numblocks) == -1)
+        return -1;
 
-	close(fd);
+    close(fd);
 
-	return 0;
+    return 0;
 }
 
 int util_dd(const char *source, const char *target, unsigned long blocks)
 {
-	int rc;
-	int i = 0;
-	char *par[64];
-	char buf[PATH_MAX];
-	char *buf_if = NULL, *buf_of = NULL, *buf_bs = NULL, *buf_count = NULL;
+    int rc;
+    int i = 0;
+    char *par[64];
+    char buf[PATH_MAX];
+    char *buf_if = NULL, *buf_of = NULL, *buf_bs = NULL, *buf_count = NULL;
 
     // get number of blocks
     if(blocks==0) {
-    	rc = util_block_num(source, &blocks);
+        rc = util_block_num(source, &blocks);
         if(rc) return rc;
     }
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "dd";
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "dd";
 
-	// input
-	snprintf(buf, ARRAY_SIZE(buf), "if=%s", source);
-	buf_if = strdup(buf);
-	par[i++] = buf_if;
+    // input
+    snprintf(buf, ARRAY_SIZE(buf), "if=%s", source);
+    buf_if = strdup(buf);
+    par[i++] = buf_if;
 
-	// output
-	snprintf(buf, ARRAY_SIZE(buf), "of=%s", target);
-	buf_of = strdup(buf);
-	par[i++] = buf_of;
+    // output
+    snprintf(buf, ARRAY_SIZE(buf), "of=%s", target);
+    buf_of = strdup(buf);
+    par[i++] = buf_of;
 
-	// blocksize (get_blknum returns 512byte blocks)
-	snprintf(buf, ARRAY_SIZE(buf), "bs=%d", 512);
-	buf_bs = strdup(buf);
-	par[i++] = buf_bs;
+    // blocksize (get_blknum returns 512byte blocks)
+    snprintf(buf, ARRAY_SIZE(buf), "bs=%d", 512);
+    buf_bs = strdup(buf);
+    par[i++] = buf_bs;
 
-	// count
-	snprintf(buf, ARRAY_SIZE(buf), "count=%lu", blocks);
-	buf_count = strdup(buf);
-	par[i++] = buf_count;
+    // count
+    snprintf(buf, ARRAY_SIZE(buf), "count=%lu", blocks);
+    buf_count = strdup(buf);
+    par[i++] = buf_count;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	// exec
-	rc = util_exec(par);
+    // exec
+    rc = util_exec(par);
 
-	// cleanup
-	free(buf_if);
-	free(buf_of);
-	free(buf_bs);
-	free(buf_count);
+    // cleanup
+    free(buf_if);
+    free(buf_of);
+    free(buf_bs);
+    free(buf_count);
 
-	return rc;
+    return rc;
 }
 
 int util_cp(const char *source, const char *target)
 {
-	int rc;
-	int i = 0;
-	char *par[64];
-	char *buf_source = NULL, *buf_target = NULL;
+    int rc;
+    int i = 0;
+    char *par[64];
+    char *buf_source = NULL, *buf_target = NULL;
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "cp";
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "cp";
 
-	// source
-	buf_source = strdup(source);
-	par[i++] = buf_source;
+    // source
+    buf_source = strdup(source);
+    par[i++] = buf_source;
 
-	// target
-	buf_target = strdup(target);
-	par[i++] = buf_target;
+    // target
+    buf_target = strdup(target);
+    par[i++] = buf_target;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	// exec
-	rc = util_exec(par);
+    // exec
+    rc = util_exec(par);
 
-	// cleanup
-	free(buf_target);
-	free(buf_source);
+    // cleanup
+    free(buf_target);
+    free(buf_source);
 
-	return rc;
+    return rc;
 }
 
 int util_shell(const char *_cmd)
 {
-	char *par[64];
-	int i = 0;
+    char *par[64];
+    int i = 0;
     int rc;
 
     // duplicate arguments
     char* cmd = strdup(_cmd);
     if(!cmd) return -ENOMEM;
 
-	// tool
-	par[i++] = MBPATH_BUSYBOX;
-	par[i++] = "sh";
+    // tool
+    par[i++] = MBPATH_BUSYBOX;
+    par[i++] = "sh";
 
-	// cmd
-	par[i++] = "-c";
-	par[i++] = cmd;
+    // cmd
+    par[i++] = "-c";
+    par[i++] = cmd;
 
-	// end
-	par[i++] = (char *)0;
+    // end
+    par[i++] = (char *)0;
 
-	rc = util_exec(par);
+    rc = util_exec(par);
 
     // free arguments
     free(cmd);
@@ -577,29 +577,29 @@ int util_shell(const char *_cmd)
 
 char *util_get_fstype(const char *filename)
 {
-	const char *type;
+    const char *type;
     char* ret = NULL;
-	blkid_probe pr;
+    blkid_probe pr;
 
     // probe device
-	pr = blkid_new_probe_from_filename(filename);
-	if (blkid_do_fullprobe(pr)) {
-		return NULL;
-	}
+    pr = blkid_new_probe_from_filename(filename);
+    if (blkid_do_fullprobe(pr)) {
+        return NULL;
+    }
 
     // get type
-	if (blkid_probe_lookup_value(pr, "TYPE", &type, NULL) < 0) {
-		goto out;
-	}
+    if (blkid_probe_lookup_value(pr, "TYPE", &type, NULL) < 0) {
+        goto out;
+    }
 
     // copy string
     ret = strdup(type);
 
 out:
     // free probe
-	blkid_free_probe(pr);
+    blkid_free_probe(pr);
 
-	return ret;
+    return ret;
 }
 
 char* util_get_espdir(const char* mountpoint, char* extbuf) {
@@ -692,7 +692,7 @@ int util_create_partition_backup_ex(const char* device, const char* file, unsign
     if(num_blocks==0)
         util_block_num(device, &num_blocks);
 
-    // create raw image if it doesn't exists yet 
+    // create raw image if it doesn't exists yet
     // or if it's size doesn't match the original partition
     if(force || !util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
         rc = util_dd(device, file, num_blocks);
@@ -759,10 +759,10 @@ char* util_device_from_mbname(const char* name) {
         struct fstab_rec *rec = &multiboot_data->mbfstab->recs[i];
 
         if(!strcmp(rec->mount_point+1, name)) {
-        	uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+            uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
             if (!bi) return NULL;
 
-        	rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
+            rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
             if(rc<0) return NULL;
 
             return strdup(buf);
