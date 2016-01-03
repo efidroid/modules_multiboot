@@ -239,6 +239,18 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
         }    
 	}
 
+    // build devzero path
+    rc = snprintf(buf, sizeof(buf), "%s/zero", path);
+    if(rc<0) {
+        return rc;
+    }
+
+    // create devzero node
+    rc = mknod(buf, S_IFCHR | 0666, makedev(1, 5));
+    if(rc<0) {
+        return rc;
+    }
+
 	return 0;
 }
 
