@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -12,6 +13,7 @@
 #include <lib/hookmgr.h>
 #include <lib/uevent.h>
 #include <lib/mounts.h>
+#include <lib/dynfilefs.h>
 #include <tracy.h>
 
 #include <common.h>
@@ -306,6 +308,15 @@ int boot_recovery(void) {
             return EFIVARS_LOG_TRACE(-1, "Can't get base dir for multiboot path\n");
         }
 
+        // make sure we have /dev/fuse
+        if(!util_exists("/dev", false)) {
+            rc = util_mkdir("/dev");
+            if(rc) {
+                return EFIVARS_LOG_TRACE(rc, "Can't create /dev directory\n");
+            }
+        }
+        mknod("/dev/fuse", S_IFCHR | 0600, makedev(10, 229));
+
         // setup multiboot partitions
         for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
             struct fstab_rec *rec;
@@ -318,6 +329,12 @@ int boot_recovery(void) {
             multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
             if(!part) {
                 return EFIVARS_LOG_TRACE(-ENOENT, "Partition '%s' wasn't found in multiboot.ini\n", rec->mount_point+1);
+            }
+
+            // get blockinfo
+            uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+            if(!bi) {
+                return EFIVARS_LOG_TRACE(-1, "Can't get blockinfo for '%s'\n", rec->blk_device);
             }
 
             // build path
@@ -375,16 +392,38 @@ int boot_recovery(void) {
                     return EFIVARS_LOG_TRACE(rc, "Can't duplicate path for loop device\n");
                 }
 
-                // build path for stub partition backup
-                rc = snprintf(buf, sizeof(buf), MBPATH_ROOT"/loopfile:%s", part->name);
-                if(rc<0) {
-                    return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
+                // get partition size
+                unsigned long num_blocks = 0;
+                rc = util_block_num(device, &num_blocks);
+                if(rc || num_blocks==0) {
+                    return EFIVARS_LOG_TRACE(rc, "Can't get size of device %s\n", rec->blk_device);
                 }
 
-                // create stub partition backup
-                rc = util_create_partition_backup_ex(MBPATH_DEV"/zero", buf, (5*1024*1024)/512llu, true);
-                if(rc) {
-                    return EFIVARS_LOG_TRACE(rc, "Can't create stub partition backup\n");
+                // mkfs needs much time for large filesystems, so just use max 1GB
+                num_blocks = MIN(num_blocks, (1024*1024*1024)/512llu);
+
+                // build path for dynfilefs mountpopint
+                rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
+                if(rc<0) {
+                    return EFIVARS_LOG_TRACE(rc, "Can't build dynfilefs partition path\n");
+                }
+
+                // build path for dynfilefs storage file
+                rc = snprintf(buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
+                if(rc<0) {
+                    return EFIVARS_LOG_TRACE(rc, "Can't build dynfilefs storage path\n");
+                }
+
+                // mount dynfilefs
+                rc = dynfilefs_mount(buf, num_blocks, buf2);
+                if(!basedir) {
+                    return EFIVARS_LOG_TRACE(rc, "can't mount dynfilefs\n");
+                }
+
+                // build path for stub partition backup
+                rc = snprintf(buf, sizeof(buf), "%s/loop.fs", buf2);
+                if(rc<0) {
+                    return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
                 }
 
                 // create new loop node
@@ -460,12 +499,6 @@ int boot_recovery(void) {
                 if(rc) {
                     return EFIVARS_LOG_TRACE(rc, "Can't setup loop device at %s for %s\n", loopdevice, partpath);
                 }
-            }
-
-            // get blockinfo
-            uevent_block_t* bi = get_blockinfo_for_path(multiboot_data->blockinfo, device);
-            if(!bi) {
-                return EFIVARS_LOG_TRACE(-1, "Can't get blockinfo for %s\n", device);
             }
 
             hookdev_mb_pdata_t* pdata = calloc(sizeof(hookdev_mb_pdata_t), 1);

@@ -46,12 +46,21 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections -Wl,-gc-
 add_definitions(-DDEVICE_NVVARS_PARTITION="${DEVICE_NVVARS_PARTITION}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMPLEFILENAME='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 
+# sepolicy inject
 add_library(sepolicy-inject STATIC
     lib/sepolicy-inject.c
 )
 target_link_libraries(sepolicy-inject sepol)
 set_target_properties(sepolicy-inject PROPERTIES
   COMPILE_FLAGS "-pipe -fno-strict-aliasing"
+)
+
+# dynfilefs
+add_library(dynfilefs STATIC
+    lib/dynfilefs/dynfilefs.c
+)
+set_target_properties(dynfilefs PROPERTIES
+    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64"
 )
 
 # main
@@ -79,7 +88,7 @@ add_executable(init
     lib/hookmgr/hookmgr_io.c
     lib/lk/cksum/crc32.c
 )
-target_link_libraries(init blkid uuid sepolicy-inject tracy pthread inih payload)
+target_link_libraries(init blkid uuid sepolicy-inject dynfilefs tracy inih payload fuse pthread dl)
 include_directories(
     include
     lib/android/include
