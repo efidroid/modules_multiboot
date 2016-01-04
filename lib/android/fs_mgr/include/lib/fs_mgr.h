@@ -50,6 +50,8 @@ struct fstab_rec {
     unsigned long flags;
     char *fs_options;
     int fs_mgr_flags;
+    char *mnt_flags_orig;
+    char *fs_mgr_flags_orig;
     char *key_loc;
     char *verity_loc;
     long long length;

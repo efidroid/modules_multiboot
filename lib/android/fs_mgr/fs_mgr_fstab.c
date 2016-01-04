@@ -286,6 +286,8 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
             ERROR("Error parsing mount_flags\n");
             goto err;
         }
+        fstab->recs[cnt].mnt_flags_orig = strdup(p);
+
         tmp_fs_options[0] = '\0';
         fstab->recs[cnt].flags = parse_flags(p, mount_flags, NULL,
                                        tmp_fs_options, FS_OPTIONS_LEN);
@@ -301,6 +303,8 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
             ERROR("Error parsing fs_mgr_options\n");
             goto err;
         }
+        fstab->recs[cnt].fs_mgr_flags_orig = strdup(p);
+
         fstab->recs[cnt].fs_mgr_flags = parse_flags(p, fs_mgr_flags,
                                                     &flag_vals, NULL, 0);
         fstab->recs[cnt].key_loc = flag_vals.key_loc;
