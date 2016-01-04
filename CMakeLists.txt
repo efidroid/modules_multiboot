@@ -70,6 +70,7 @@ add_executable(init
     src/multiboot_init.c
     src/util.c
     src/boot_recovery.c
+    src/boot_android.c
 
     # libs
     lib/efivars.c

@@ -70,5 +70,6 @@ int run_init(struct tracy *tracy);
 int multiboot_main(int argc, char** argv);
 multiboot_data_t* multiboot_get_data(void);
 int boot_recovery(void);
+int boot_android(void);
 
 #endif

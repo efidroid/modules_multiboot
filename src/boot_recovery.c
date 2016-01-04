@@ -22,7 +22,7 @@
 #define LOG_TAG "BOOT_RECOVERY"
 #include <lib/log.h>
 
-multiboot_data_t* multiboot_data = NULL;
+static multiboot_data_t* multiboot_data = NULL;
 
 typedef struct {
     hookmgr_device_t dev;
