@@ -438,9 +438,43 @@ int util_mke2fs(const char *_device, const char* _fstype)
     return rc;
 }
 
+int util_mkfs_f2fs(const char *_device)
+{
+    char *par[64];
+    int i = 0;
+    int rc;
+
+    // duplicate arguments
+    char* device = strdup(_device);
+    if(!device) return -ENOMEM;
+
+    // tool
+    par[i++] = MBPATH_MKFS_F2FS;
+
+    // discard
+    par[i++] = "-t";
+    par[i++] = "1";
+
+    // device
+    par[i++] = device;
+
+    // end
+    par[i++] = (char *)0;
+
+    rc = util_exec(par);
+
+    // free arguments
+    free(device);
+
+    return rc;
+}
+
 int util_mkfs(const char *device, const char* fstype) {
     if(!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
         return util_mke2fs(device, fstype);
+
+    if(!strcmp(fstype, "f2fs"))
+        return util_mkfs_f2fs(device);
 
     return -1;
 }

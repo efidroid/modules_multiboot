@@ -22,6 +22,7 @@
 PAYLOAD_IMPORT(fstab_multiboot);
 PAYLOAD_IMPORT(busybox);
 PAYLOAD_IMPORT(mke2fs);
+PAYLOAD_IMPORT(mkfs_f2fs);
 static multiboot_data_t multiboot_data = {0};
 
 multiboot_data_t* multiboot_get_data(void) {
@@ -486,6 +487,12 @@ int multiboot_main(unused int argc, char** argv) {
 
     // extract mke2fs
     rc = util_extractbin(PAYLOAD_PTR(mke2fs), MBPATH_MKE2FS, PAYLOAD_SIZE(mke2fs));
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
+    }
+
+    // extract mke2fs
+    rc = util_extractbin(PAYLOAD_PTR(mkfs_f2fs), MBPATH_MKFS_F2FS, PAYLOAD_SIZE(mkfs_f2fs));
     if(rc) {
         return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
     }

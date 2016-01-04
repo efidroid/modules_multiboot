@@ -38,6 +38,7 @@ int util_make_loop(const char *path);
 int util_losetup(const char *device, const char *file, bool ro);
 int util_losetup_free(const char *_device);
 int util_mke2fs(const char *device, const char* fstype);
+int util_mkfs_f2fs(const char *device);
 int util_mkfs(const char *device, const char* fstype);
 int util_block_num(const char *path, unsigned long* numblocks);
 int util_dd(const char *source, const char *target, unsigned long blocks);
