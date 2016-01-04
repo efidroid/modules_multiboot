@@ -63,6 +63,7 @@ typedef struct {
     uevent_block_info_t* blockinfo;
     char* hwname;
     struct fstab *romfstab;
+    char* romfstabpath;
 
 } multiboot_data_t;
 

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <lib/efivars.h>
 #include <lib/mounts.h>
@@ -171,11 +172,20 @@ static void init_usr_handler(unused int sig, unused siginfo_t* info, unused void
     init_usr_interrupt = 1;
 }
 
+#define CHECK_WRITE(fd, str) \
+        len = strlen(str); \
+        bytes_written = write(fd, str, len); \
+        if(bytes_written!=(size_t)len) { \
+            return EFIVARS_LOG_TRACE(-errno, "Can't write\n"); \
+        }
+
 int boot_android(void) {
     multiboot_data = multiboot_get_data();
 
     int rc;
+    int i;
     char buf[PATH_MAX];
+    char buf2[PATH_MAX];
 
     // boot main system
     if(!multiboot_data->is_multiboot) {
@@ -230,6 +240,89 @@ int boot_android(void) {
 
     // boot multiboot system
     else {
-        return EFIVARS_LOG_TRACE(-1, "UNSUPPORTED\n");
+        size_t bytes_written;
+        size_t len;
+
+        // get directory of multiboot.ini
+        char* basedir = util_dirname(multiboot_data->path);
+        if(!basedir) {
+            return EFIVARS_LOG_TRACE(-1, "Can't get base dir for multiboot path\n");
+        }
+
+        // open fstab for writing
+        int fd = open(multiboot_data->romfstabpath, O_WRONLY|O_TRUNC);
+        if(fd<0) {
+            return EFIVARS_LOG_TRACE(-errno, "Can't open init.rc for writing\n");
+        }
+
+        // write entries
+        for(i=0; i<multiboot_data->romfstab->num_entries; i++) {
+            struct fstab_rec *rec;
+            rec = &multiboot_data->romfstab->recs[i];
+
+            const char* blk_device = rec->blk_device;
+            const char* mnt_flags = rec->mnt_flags_orig;
+
+            // get multiboot part
+            // TODO: use blkdevice
+            multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
+            if(part) {
+                // build path
+                rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
+                if(rc<0) {
+                    return EFIVARS_LOG_TRACE(-1, "Can't build path for partition '%s'\n", part->name);
+                }
+
+                if(part->is_bind) {
+                    blk_device = buf;
+                    mnt_flags = "bind";
+                }
+                else {
+                    // build loop path
+                    rc = snprintf(buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
+                    if(rc<0) {
+                        return EFIVARS_LOG_TRACE(rc, "Can't build path for loop device\n");
+                    }
+
+                    // create new node
+                    rc = util_make_loop(buf2);
+                    if(rc) {
+                        return EFIVARS_LOG_TRACE(rc, "Can't create loop device at %s\n", buf2);
+                    }
+
+                    // setup loop device
+                    rc = util_losetup(buf2, buf, false);
+                    if(rc) {
+                        return EFIVARS_LOG_TRACE(rc, "Can't setup loop device at %s for %s\n", buf2, buf);
+                    }
+
+                    blk_device = buf2;
+                }
+            }
+
+            // allocate line buffer
+            size_t linelen = strlen(blk_device) + strlen(rec->mount_point) + strlen(rec->fs_type) + strlen(mnt_flags) + strlen(rec->fs_mgr_flags_orig) + 6;
+            char* line = malloc(linelen);
+            if(!line) {
+                return EFIVARS_LOG_TRACE(-errno, "Can't allocate memory\n");
+            }
+
+            // build line
+            rc = snprintf(line, linelen, "%s %s %s %s %s\n", blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
+            if(rc<0 || (size_t)rc>=linelen) {
+                return EFIVARS_LOG_TRACE(-errno, "Can't build fstab line\n");
+            }
+
+            // write line
+            CHECK_WRITE(fd, line);
+
+            // free line
+            free(line);
+        }
+
+        // close file
+        close(fd);
+
+        return run_init(NULL);
     }
 }

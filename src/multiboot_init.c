@@ -364,6 +364,7 @@ int multiboot_main(unused int argc, char** argv) {
     if(rc<0) {
         return EFIVARS_LOG_TRACE(rc, "Can't build fstab name: %s\n", strerror(errno));
     }
+    multiboot_data.romfstabpath = strdup(buf);
 
     // parse ROM fstab
     multiboot_data.romfstab = fs_mgr_read_fstab(buf);
