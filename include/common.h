@@ -25,6 +25,7 @@
 #define MBPATH_ESP MBPATH_ROOT "/esp"
 #define MBPATH_BOOTDEV MBPATH_ROOT "/bootdev"
 #define MBPATH_STUB MBPATH_ROOT "/stub"
+#define MBPATH_DATA MBPATH_ROOT "/data"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
 #define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"

@@ -135,6 +135,83 @@ static void dev_mb_mount(hookmgr_device_t* dev, unused hookmgr_mount_event_t* ev
     }
 }
 
+static void dev_mb_mount_post(hookmgr_device_t* dev, unused hookmgr_mount_event_t* event) {
+    hookdev_mb_pdata_t* pdata = (hookdev_mb_pdata_t*)dev;
+    int rc;
+    char buf[PATH_MAX];
+
+    if(pdata->part->is_bind && !strcmp(pdata->part->name, "data")) {
+        LOGV("bind mount datamedia for: %s %s\n", event->source, event->target);
+
+        // build target dir path
+        rc = snprintf(buf, sizeof(buf), "%s/media", event->target);
+        if((size_t)rc>=sizeof(buf)) {
+            EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
+            return;
+        }
+
+        // create source dir
+        if(!util_exists(MBPATH_DATA"/media", false)) {
+            rc = util_mkdir(MBPATH_DATA"/media");
+            if(rc) {
+                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on source: %s\n", rc);
+                return;
+            }
+        }
+
+        // create target dir
+        if(!util_exists(buf, false)) {
+            rc = util_mkdir(buf);
+            if(rc) {
+                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on target: %s\n", rc);
+                return;
+            }
+        }
+
+        // bind mount
+        rc = mount(MBPATH_DATA"/media", buf, NULL, MS_BIND, NULL);
+        if(rc) {
+            EFIVARS_LOG_FATAL(rc, "Can't bind mount datamedia: %s\n", strerror(errno));
+            return;
+        }
+    }
+}
+
+static void dev_mb_umount(hookmgr_device_t* dev, hookmgr_umount_event_t* event) {
+    hookdev_mb_pdata_t* pdata = (hookdev_mb_pdata_t*)dev;
+    int rc;
+    char buf[PATH_MAX];
+
+    if(pdata->part->is_bind && !strcmp(pdata->part->name, "data")) {
+        // scan mounted volumes
+        rc = scan_mounted_volumes();
+        if(rc) {
+            EFIVARS_LOG_FATAL(rc, "Can't scan mounted volumes: %s\n", strerror(errno));
+            return;
+        }
+
+        if(!strcmp(event->target, "/data")) {
+            // build target dir path
+            rc = snprintf(buf, sizeof(buf), "%s/media", event->target);
+            if((size_t)rc>=sizeof(buf)) {
+                EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
+                return;
+            }
+
+            // check if datamedia is mounted at this path
+            const mounted_volume_t* volume = find_mounted_volume_by_mount_point(buf);
+            if(volume) {
+                LOGV("unmount datamedia for %s\n", event->target);
+                rc = umount(buf);
+                if(rc) {
+                    EFIVARS_LOG_FATAL(-ENOMEM, "Can't unmount datamedia for %s\n", event->target);
+                    return;
+                }
+            }
+        }
+    }
+}
+
 static void dev_mb_open(hookmgr_device_t* dev, hookmgr_open_event_t* event) {
     hookdev_mb_pdata_t* pdata = (hookdev_mb_pdata_t*)dev;
 
@@ -399,6 +476,8 @@ int boot_recovery(void) {
             pdata->dev.major = bi->major;
             pdata->dev.minor = bi->minor;
             pdata->dev.mount = dev_mb_mount;
+            pdata->dev.mount_post = dev_mb_mount_post;
+            pdata->dev.umount = dev_mb_umount;
             pdata->dev.open = dev_mb_open;
             pdata->dev.close_post = dev_mb_close_post;
             pdata->part = part;

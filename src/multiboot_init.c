@@ -567,6 +567,33 @@ int multiboot_main(unused int argc, char** argv) {
             return EFIVARS_LOG_TRACE(rc, "Can't mount boot device: %s\n", strerror(errno));
         }
 
+        // get rec for /data
+        struct fstab_rec* datarecmb = fs_mgr_get_by_mountpoint(multiboot_data.mbfstab, "/data");
+        if(!datarecmb) {
+            return EFIVARS_LOG_TRACE(rc, "Can't get rec for /data\n");
+        }
+
+        // get blockinfo for /data
+        uevent_block_t* datablock = get_blockinfo_for_path(multiboot_data.blockinfo, datarecmb->blk_device);
+        if(!data) {
+            return EFIVARS_LOG_TRACE(rc, "Can't get blockinfo for /data\n");
+        }
+
+        // get the ROM's mount flags for /data
+        mountflags = 0;
+        data = NULL;
+        struct fstab_rec* datarec = fs_mgr_get_by_ueventblock(multiboot_data.romfstab, datablock);
+        if(datarec) {
+            mountflags = datarec->flags;
+            data = (void*)datarec->fs_options;
+        }
+
+        // mount data
+        rc = uevent_mount(datablock, MBPATH_DATA, NULL, mountflags, data);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Can't mount data: %s\n", strerror(errno));
+        }
+
         // check for bind-mount support
         rc = scan_mounted_volumes();
         if(rc) {
