@@ -577,13 +577,13 @@ int multiboot_main(unused int argc, char** argv) {
         // get rec for /data
         struct fstab_rec* datarecmb = fs_mgr_get_by_mountpoint(multiboot_data.mbfstab, "/data");
         if(!datarecmb) {
-            return EFIVARS_LOG_TRACE(rc, "Can't get rec for /data\n");
+            return EFIVARS_LOG_TRACE(-ENOENT, "Can't get rec for /data\n");
         }
 
         // get blockinfo for /data
         uevent_block_t* datablock = get_blockinfo_for_path(multiboot_data.blockinfo, datarecmb->blk_device);
-        if(!data) {
-            return EFIVARS_LOG_TRACE(rc, "Can't get blockinfo for /data\n");
+        if(!datablock) {
+            return EFIVARS_LOG_TRACE(-ENOENT, "Can't get blockinfo for %s\n", datarecmb->blk_device);
         }
 
         // get the ROM's mount flags for /data
@@ -722,8 +722,7 @@ int multiboot_main(unused int argc, char** argv) {
 
     // TODO: boot multiboot system
     else {
-        LOGE("UNSUPPORTED\n");
-        return -1;
+        return EFIVARS_LOG_TRACE(-1, "UNSUPPORTED\n");
     }
 
     return rc;
