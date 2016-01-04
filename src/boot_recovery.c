@@ -400,7 +400,7 @@ int boot_recovery(void) {
                 }
 
                 // mkfs needs much time for large filesystems, so just use max 1GB
-                num_blocks = MIN(num_blocks, (1024*1024*1024)/512llu);
+                num_blocks = MIN(num_blocks, (200*1024*1024)/512llu);
 
                 // build path for dynfilefs mountpopint
                 rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
