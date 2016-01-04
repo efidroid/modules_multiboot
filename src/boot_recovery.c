@@ -239,8 +239,8 @@ static void dev_mb_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_
         }
 
         // create id file
-        if(fstype!=pdata->previous_fstype || !util_exists(MBPATH_STUB_IDFILE, false)) {
-            LOGI("%s got formatted!\n", pdata->loopdevice);
+        if(util_strcmpnull(fstype, pdata->previous_fstype) || !util_exists(MBPATH_STUB_IDFILE, false)) {
+            LOGI("%s got formatted! %s=>%s\n", pdata->loopdevice, fstype, pdata->previous_fstype);
 
             // create id file
             int fd = open(MBPATH_STUB_IDFILE, O_RDWR|O_CREAT);

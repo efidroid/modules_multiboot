@@ -834,3 +834,11 @@ multiboot_partition_t* util_mbpart_by_name(const char* name) {
 
     return NULL;
 }
+
+int util_strcmpnull(const char * str1, const char * str2) {
+    if(str1==NULL && str2!=NULL)
+        return -1;
+    if(str2==NULL && str1!=NULL)
+        return -1;
+    return strcmp(str1, str2);
+}
