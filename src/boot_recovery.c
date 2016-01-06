@@ -416,7 +416,7 @@ int boot_recovery(void) {
 
                 // mount dynfilefs
                 rc = dynfilefs_mount(buf, num_blocks, buf2);
-                if(!basedir) {
+                if(rc) {
                     return EFIVARS_LOG_TRACE(rc, "can't mount dynfilefs\n");
                 }
 
