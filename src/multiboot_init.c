@@ -120,15 +120,15 @@ int run_init(struct tracy *tracy)
     par[i++] = "/init";
     par[i++] = (char *)0;
 
+    // close all file handles
+    int fd;
+    for(fd=0; fd<10; fd++)
+        close(fd);
+
     // RUN
     if (tracy)
         ret = !tracy_exec(tracy, par);
     else {
-        // close all file handles
-        int fd;
-        for(fd=0; fd<10; fd++)
-            close(fd);
-
         ret = execve(par[0], par, NULL);
     }
 
