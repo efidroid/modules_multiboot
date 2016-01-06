@@ -22,12 +22,22 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <wait.h>
+
+#define LOG_TAG "DYNFILEFS"
+#include <lib/log.h>
+
+#include <lib/efivars.h>
 #include <util.h>
+
+#define DYNFILE_MAGIC "DynfileFS2"
+typedef struct {
+    char magic[24];
+    uint64_t virtual_size;
+} dynfile_header_t;
 
 static const char *dynfilefs_path = "/loop.fs";
 static const char *save_path = "changes.dat";
-static const char *header = "DynfilefsFS 2.20 (c) 2012 Tomas M <www.slax.org>";
-off_t virtual_size = 0;
+static dynfile_header_t header;
 off_t first_index = 0;
 off_t zero = 0;
 
@@ -69,7 +79,7 @@ static int dynfilefs_getattr(const char *path, struct stat *stbuf)
 	} else if (strcmp(path, dynfilefs_path) == 0) {
 		stbuf->st_mode = S_IFREG | 0444;
 		stbuf->st_nlink = 1;
-		stbuf->st_size = virtual_size;
+		stbuf->st_size = header.virtual_size;
 	} else
 		res = -ENOENT;
 
@@ -204,16 +214,19 @@ static struct fuse_operations dynfilefs_oper = {
 	.flush		= dynfilefs_flush,
 };
 
-int dynfilefs_mount(const char* storage_file, unsigned long size, const char* mountpoint)
+int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* mountpoint)
 {
     int ret;
     char *argv[64];
     int argc = 0;
+    char cmpmagic[24];
+
+    memset(cmpmagic, 0, sizeof(cmpmagic));
+    memcpy(cmpmagic, DYNFILE_MAGIC, strlen(DYNFILE_MAGIC));
 
     save_path = storage_file;
-    virtual_size = size*512llu;
 
-    if (size == 0)
+    if (blocks == 0)
     {
        return -EINVAL;
     }
@@ -233,30 +246,43 @@ int dynfilefs_mount(const char* storage_file, unsigned long size, const char* mo
        fp = fopen(save_path, "w+");
        if (fp == NULL)
        {
-          printf("cannot open %s for writing\n", save_path);
-          return 14;
+          return EFIVARS_LOG_TRACE(14, "cannot open %s for writing\n", save_path);
        }
 
-       ret = fwrite(header,strlen(header),1,fp);
+       // build header
+       header.virtual_size = blocks*512llu;
+       memcpy(header.magic, cmpmagic, sizeof(header.magic));
+
+       // write header
+       ret = fwrite(&header,sizeof(header),1,fp);
        if (ret < 0)
        {
-          printf("cannot write to %s\n", save_path);
-          return 15;
+          return EFIVARS_LOG_TRACE(15, "cannot write to %s\n", save_path);
        }
-       fseeko(fp, strlen(header) + NUM_INDEXED_BLOCKS*sizeof(zero)*2, SEEK_SET);
+       fseeko(fp, sizeof(header) + NUM_INDEXED_BLOCKS*sizeof(zero)*2, SEEK_SET);
        ret = fwrite(&zero,sizeof(zero),1,fp);
     }
 
     if (fp == NULL)
     {
-       printf("cannot open %s for writing\n", save_path);
-       return 16;
+       return EFIVARS_LOG_TRACE(16, "cannot open %s for writing\n", save_path);
     }
 
     fseeko(fp, 0, SEEK_SET);
 
+    // read header
+    ret = fread(&header, sizeof(header), 1, fp);
+    if(ret < 0) {
+       return EFIVARS_LOG_TRACE(-1, "cannot read header of %s\n", save_path);
+    }
+
+    // check magic
+    if(memcmp(header.magic, cmpmagic, sizeof(cmpmagic))) {
+       return EFIVARS_LOG_TRACE(-1, "invalid magic in %s\n", save_path);
+    }
+
     // first index is always right after the header. Get the position
-    first_index = strlen(header);
+    first_index = sizeof(header);
 
     // empty block is needed for comparison. Blocks full of null bytes are not stored
     memset((void*)&empty, 0, sizeof(empty));
