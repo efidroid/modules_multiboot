@@ -152,6 +152,11 @@ static int selinux_fixup(void) {
     // { execute } for  uid=0 pid=166 comm="e2fsck" path="/dev/__properties__" dev="tmpfs" ino=5017 scontext=u:r:init:s0 tcontext=u:object_r:properties_device:s0 tclass=file
     util_sepolicy_inject("init", "properties_device", "file", "execute");
 
+    // Android M needs these to run /init
+    // { execute } for  uid=0 pid=1 comm="init" path="/file_contexts" dev="rootfs" ino=4541 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
+    // { execute } for  uid=0 pid=1 comm="init" name="init" dev="rootfs" ino=4543 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
+    util_sepolicy_inject("kernel", "rootfs", "file", "execute");
+
     // for sending SIGUSR1 from trigger-postfs to init.multiboot
     // { signal } for  uid=0 pid=209 comm="trigger-postfs-" scontext=u:r:init:s0 tcontext=u:r:kernel:s0 tclass=process
     util_sepolicy_inject("init", "kernel", "process", "signal");
@@ -161,11 +166,37 @@ static int selinux_fixup(void) {
     // for creating POSTFS_NOTIFICATION_FILE
     // { write } for  uid=0 pid=156 comm="init.multiboot" path=2F6465762F5F5F6B6D73675F5F202864656C6574656429 dev="rootfs" ino=5004 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=chr_file
     util_sepolicy_inject("kernel", "rootfs", "chr_file", "write");
+    // Android M
+    // { execute_no_trans } for uid=0 pid=188 comm="init" path="/init.multiboot" dev="rootfs" ino=4575 scontext=u:r:init:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
+    util_sepolicy_inject("init", "rootfs", "file", "execute_no_trans");
+    // { search } for uid=0 pid=153 comm="init.multiboot" name="1" dev="proc" ino=5311 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=dir permissive=0
+    util_sepolicy_inject("kernel", "init", "dir", "search");
+    // { read } for uid=0 pid=153 comm="init.multiboot" name="mountinfo" dev="proc" ino=6119 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=file permissive=0
+    // { open } for uid=0 pid=152 comm="init.multiboot" name="mountinfo" dev="proc" ino=7086 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=file permissive=0
+    util_sepolicy_inject("kernel", "init", "file", "read,open");
+    // { search } for uid=0 pid=153 comm="init.multiboot" name="media" dev="mmcblk0p36" ino=106 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=0
+    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/data/media" dev="mmcblk0p36" ino=106 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=0
+    // { write } for uid=0 pid=209 comm="busybox" name="UEFIESP" dev="mmcblk0p36" ino=38022 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=1
+    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "search,getattr,write");
+    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/dev/block/mmcblk0p32" dev="tmpfs" ino=6864 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
+    // { read } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=7050 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
+    // { ioctl } for uid=0 pid=151 comm="init.multiboot" path="/dev/block/mmcblk0p32" dev="tmpfs" ino=6424 ioctlcmd=1260 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=1
+    // { open } for uid=0 pid=153 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6182 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
+    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,ioctl,open");
+    // { write } for uid=0 pid=151 comm="init.multiboot" name="block" dev="tmpfs" ino=6217 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
+    // { remove_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6424 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
+    // { add_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
+    util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
+    // { create } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
+    // { write open } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
+    // { read } for uid=0 pid=210 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
+    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "create,write,read,open");
 
     // the following rules are needed for setting up UEFI partition replacements
     // { execute } for  uid=0 pid=210 comm="init.multiboot" name="busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
     // { execute_no_trans } for  uid=0 pid=210 comm="init.multiboot" path="/multiboot/bin/busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
-    util_sepolicy_inject("kernel", "tmpfs", "file", "execute,execute_no_trans");
+    // { open } for uid=0 pid=209 comm="init.multiboot" name="busybox" dev="tmpfs" ino=5507 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file permissive=1
+    util_sepolicy_inject("kernel", "tmpfs", "file", "execute,execute_no_trans,open");
     // { execmem } for  uid=0 pid=210 comm="busybox" scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
     util_sepolicy_inject("kernel", "kernel", "process", "execmem");
     // { unlink } for  uid=0 pid=157 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6980 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
