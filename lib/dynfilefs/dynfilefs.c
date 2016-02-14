@@ -87,19 +87,17 @@ static int dynfilefs_getattr(const char *path, struct stat *stbuf)
 }
 
 static int dynfilefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi,
-			 enum fuse_readdir_flags flags)
+			 off_t offset, struct fuse_file_info *fi)
 {
 	(void) offset;
 	(void) fi;
-	(void) flags;
 
 	if (strcmp(path, "/") != 0)
 		return -ENOENT;
 
-	filler(buf, ".", NULL, 0, 0);
-	filler(buf, "..", NULL, 0, 0);
-	filler(buf, dynfilefs_path + 1, NULL, 0, 0);
+	filler(buf, ".", NULL, 0);
+	filler(buf, "..", NULL, 0);
+	filler(buf, dynfilefs_path + 1, NULL, 0);
 
 	return 0;
 }
