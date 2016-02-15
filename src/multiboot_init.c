@@ -400,7 +400,15 @@ int multiboot_main(unused int argc, char** argv) {
     // parse ROM fstab
     multiboot_data.romfstab = fs_mgr_read_fstab(buf);
     if(!multiboot_data.romfstab) {
-        return EFIVARS_LOG_TRACE(rc, "Can't parse %s: %s\n", buf, strerror(errno));
+        // for Android, this fstab is mandatory
+        if(!util_exists("/sbin/recovery", true))
+            return EFIVARS_LOG_TRACE(rc, "Can't parse %s: %s\n", buf, strerror(errno));
+
+        // try /etc/twrp.fstab
+        multiboot_data.romfstab = fs_mgr_read_fstab("/etc/twrp.fstab");
+        if(multiboot_data.romfstab) {
+            multiboot_data.romfstabpath = strdup("/etc/twrp.fstab");
+        }
     }
 
     // get ESP partition
