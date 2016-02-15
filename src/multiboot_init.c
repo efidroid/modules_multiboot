@@ -190,7 +190,8 @@ static int selinux_fixup(void) {
     // { create } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
     // { write open } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
     // { read } for uid=0 pid=210 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
-    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "create,write,read,open");
+    // { getattr } for uid=0 pid=152 comm="init.multiboot" path="/data/media/UEFIESP/partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=0
+    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "create,write,read,open,getattr");
 
     // the following rules are needed for setting up UEFI partition replacements
     // { execute } for  uid=0 pid=210 comm="init.multiboot" name="busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
