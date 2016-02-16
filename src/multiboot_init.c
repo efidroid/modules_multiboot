@@ -67,6 +67,16 @@ static void import_kernel_nv(char *name)
         multiboot_data.path = path;
     }
 
+    if (!strcmp(name, "multiboot.debug")) {
+        uint32_t val;
+        if (sscanf(value, "%u", &val) != 1) {
+            LOGE("invalid value for %s", name);
+            return;
+        }
+
+        log_set_level(val);
+    }
+
     else if (!strcmp(name, "androidboot.hardware")) {
         multiboot_data.hwname = strdup(value);
     }
