@@ -485,7 +485,7 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
         va_end(ap);
 
         // Check error code
-        if (n < 0 || n>=size)
+        if (n < 0)
             return error;
 
         // If that worked, we're done
