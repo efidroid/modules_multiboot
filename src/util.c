@@ -628,7 +628,13 @@ char *util_get_fstype(const char *filename)
 
     // probe device
     pr = blkid_new_probe_from_filename(filename);
+    if(!pr) {
+        EFIVARS_LOG_TRACE(-EINVAL, "can't create probe for %s\n", filename);
+        return NULL;
+    }
+
     if (blkid_do_fullprobe(pr)) {
+        EFIVARS_LOG_TRACE(-EINVAL, "can't probe %s\n", filename);
         return NULL;
     }
 
