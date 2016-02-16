@@ -367,7 +367,7 @@ int multiboot_main(unused int argc, char** argv) {
         return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
     }
 
-    // extract mke2fs
+    // extract mkfs.f2fs
     rc = util_extractbin(PAYLOAD_PTR(mkfs_f2fs), MBPATH_MKFS_F2FS, PAYLOAD_SIZE(mkfs_f2fs));
     if(rc) {
         return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
