@@ -45,7 +45,7 @@ int efivar_get_efidroid(const char* name, uint32_t* datasize, void* data);
 int efivar_set_efidroid(const char* name, uint32_t datasize, const void* data);
 
 int efivars_report_error(const char* error);
-int efivars_append_error(int fatal, int log, int error, const char* tag, const char* fmt, ...);
+int efivars_append_error(int fatal, int log, int error, const char* tag, const char* fmt, ...) __attribute__ ((format(printf, 5, 6)));
 
 int efivars_report_errorbuf(void);
 #endif
