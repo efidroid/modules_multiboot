@@ -86,7 +86,7 @@ tracy_child_addr_t hookmgr_child_alloc(struct tracy_child * child, size_t size)
                     PROT_READ | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (rc < 0 || !addr) {
-        EFIVARS_LOG_TRACE(rc, "Can't allocate child memory\n");
+        EFIVARS_LOG_TRACE((int)rc, "Can't allocate child memory\n");
         return NULL;
     }
 
@@ -161,13 +161,13 @@ tracy_child_addr_t strtochild(struct tracy_child * child, const char *path)
                     PROT_READ | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (rc < 0 || !path_new) {
-        EFIVARS_LOG_TRACE(rc, "Can't allocate child memory\n");
+        EFIVARS_LOG_TRACE((int)rc, "Can't allocate child memory\n");
         goto err;
     }
     // copy new devname
     rc = tracy_write_mem(child, path_new, (char*)path, (size_t)len);
     if (rc < 0) {
-        EFIVARS_LOG_TRACE(rc, "Can't copy memory to child\n");
+        EFIVARS_LOG_TRACE((int)rc, "Can't copy memory to child\n");
         goto err_munmap;
     }
 
@@ -346,7 +346,7 @@ static void hookmgr_child_destroy(struct tracy_child *child)
 }
 
 static int hookmgr_hook_unimplemented(struct tracy_event* e) {
-    EFIVARS_LOG_FATAL(-1, "syscall %s(%d) is unimplemented!\n", get_syscall_name_abi(e->syscall_num, e->abi), e->syscall_num);
+    EFIVARS_LOG_FATAL(-1, "syscall %s(%ld) is unimplemented!\n", get_syscall_name_abi(e->syscall_num, e->abi), e->syscall_num);
     return TRACY_HOOK_ABORT;
 }
 

@@ -156,7 +156,7 @@ static void dev_mb_mount_post(hookmgr_device_t* dev, unused hookmgr_mount_event_
         if(!util_exists(MBPATH_DATA"/media", false)) {
             rc = util_mkdir(MBPATH_DATA"/media");
             if(rc) {
-                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on source: %s\n", rc);
+                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on source: %s\n", strerror(rc));
                 return;
             }
         }
@@ -165,7 +165,7 @@ static void dev_mb_mount_post(hookmgr_device_t* dev, unused hookmgr_mount_event_
         if(!util_exists(buf, false)) {
             rc = util_mkdir(buf);
             if(rc) {
-                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on target: %s\n", rc);
+                EFIVARS_LOG_FATAL(rc, "Can't create datamedia on target: %s\n", strerror(rc));
                 return;
             }
         }

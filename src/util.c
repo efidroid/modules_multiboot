@@ -317,7 +317,7 @@ int util_mount(const char *source, const char *target,
     free(util_fstype);
 
     if(rc) {
-        return EFIVARS_LOG_TRACE(rc, "mount(%s, %s, %s, %lu, %p) failed\n");
+        return EFIVARS_LOG_TRACE(rc, "mount(%s, %s, %s, %lu, %p) failed\n", source, target, filesystemtype, mountflags, data);
     }
 
     return rc;
