@@ -151,9 +151,10 @@ int util_mkdir(const char *dir) {
     for(p = tmp + 1; *p; p++) {
         if(*p == '/') {
             *p = 0;
-            if(!util_exists(tmp, true))
+            if(!util_exists(tmp, true)) {
                 rc = mkdir(tmp, S_IRWXU);
-            if(rc) return rc;
+                if(rc) goto done;
+            }
 
             *p = '/';
         }
@@ -161,9 +162,13 @@ int util_mkdir(const char *dir) {
 
 
     if(!util_exists(tmp, true))
-        return mkdir(tmp, S_IRWXU);
+        rc = mkdir(tmp, S_IRWXU);
 
-    return 0;
+done:
+    if(rc)
+        return EFIVARS_LOG_TRACE(rc, "can't create dir %s\n", dir);
+
+    return rc;
 }
 
 int util_exec(char **args)
