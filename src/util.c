@@ -307,7 +307,9 @@ int util_mount(const char *source, const char *target,
     // get fstype
     if(!filesystemtype) {
         filesystemtype = util_fstype = util_get_fstype(source);
-        if(!filesystemtype) return -EINVAL;
+        if(!filesystemtype) {
+            return EFIVARS_LOG_TRACE(-EINVAL, "can't get filesystem for %s\n", source);
+        }
     }
 
     // mount
