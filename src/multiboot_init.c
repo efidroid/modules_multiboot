@@ -445,6 +445,9 @@ int multiboot_main(unused int argc, char** argv) {
     }
     LOGV("get blockinfo for ESP\n");
     multiboot_data.espdev = get_blockinfo_for_path(multiboot_data.blockinfo, multiboot_data.esp->blk_device);
+    if(!multiboot_data.espdev) {
+        return EFIVARS_LOG_TRACE(-ENOENT, "can't get blockinfo for ESP\n");
+    }
 
     // grant ourselves some selinux permissions :)
     LOGD("patch sepolicy\n");
