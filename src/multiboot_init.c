@@ -491,7 +491,13 @@ int multiboot_main(unused int argc, char** argv) {
         LOGD("mount boot device\n");
         rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, mountflags, data);
         if(rc) {
-            return EFIVARS_LOG_TRACE(rc, "Can't mount boot device: %s\n", strerror(errno));
+            // mount without flags
+            LOGI("mount bootdev without flags\n");
+            mountflags = 0;
+            data = NULL;
+            rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, mountflags, data);
+            if(rc)
+                return EFIVARS_LOG_TRACE(rc, "Can't mount boot device: %s\n", strerror(errno));
         }
 
         // get rec for /data
@@ -522,7 +528,13 @@ int multiboot_main(unused int argc, char** argv) {
         LOGD("mount /data\n");
         rc = uevent_mount(datablock, MBPATH_DATA, NULL, mountflags, data);
         if(rc) {
-            return EFIVARS_LOG_TRACE(rc, "Can't mount data: %s\n", strerror(errno));
+            // mount without flags
+            LOGI("mount /data without flags\n");
+            mountflags = 0;
+            data = NULL;
+            rc = uevent_mount(datablock, MBPATH_DATA, NULL, mountflags, data);
+            if(rc)
+                return EFIVARS_LOG_TRACE(rc, "Can't mount data: %s\n", strerror(errno));
         }
 
         // check for bind-mount support

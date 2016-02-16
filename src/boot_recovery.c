@@ -68,13 +68,21 @@ static void dev_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_t* 
             // use the ROM's mount options for this partition
             mountflags = esprec->flags;
             data = (void*)esprec->fs_options;
+            LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
         }
 
         // mount ESP
         rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
         if(rc) {
-            EFIVARS_LOG_FATAL(rc, "Can't mount ESP: %s\n", strerror(errno));
-            return;
+            // mount without flags
+            LOGI("mount ESP without flags\n");
+            mountflags = 0;
+            data = NULL;
+            rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
+            if(rc) {
+                EFIVARS_LOG_FATAL(rc, "Can't mount ESP: %s\n", strerror(errno));
+                return;
+            }
         }
 
         mountpoint = MBPATH_ESP;
@@ -536,12 +544,19 @@ int boot_recovery(void) {
             // use the ROM's mount options for this partition
             mountflags = esprec->flags;
             data = (void*)esprec->fs_options;
+            LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
         }
 
         // mount ESP
         rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
         if(rc) {
-            return EFIVARS_LOG_TRACE(rc, "Can't mount ESP: %s\n", strerror(errno));
+            // mount without flags
+            LOGI("mount ESP without flags\n");
+            mountflags = 0;
+            data = NULL;
+            rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
+            if(rc)
+                return EFIVARS_LOG_TRACE(rc, "Can't mount ESP: %s\n", strerror(errno));
         }
 
         // get espdir
