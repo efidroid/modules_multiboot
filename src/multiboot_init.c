@@ -393,7 +393,7 @@ int multiboot_main(unused int argc, char** argv) {
 
     // build fstab name
     rc = snprintf(buf, sizeof(buf), "/fstab.%s", multiboot_data.hwname);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
         return EFIVARS_LOG_TRACE(rc, "Can't build fstab name: %s\n", strerror(errno));
     }
     multiboot_data.romfstabpath = strdup(buf);
@@ -501,7 +501,7 @@ int multiboot_main(unused int argc, char** argv) {
 
         // build multiboot.ini filename
         rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s", multiboot_data.path);
-        if(rc<0) {
+        if(rc<0 || (size_t)rc>=sizeof(buf)) {
             return EFIVARS_LOG_TRACE(rc, "Can't build multiboot.ini path: %s\n", strerror(errno));
         }
 

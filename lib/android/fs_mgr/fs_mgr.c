@@ -535,7 +535,7 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
 
     // build dev name
     rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", block->devname);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
         return NULL;
     }
 

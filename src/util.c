@@ -664,7 +664,7 @@ char* util_get_espdir(const char* mountpoint, char* extbuf) {
 
     // build UEFIESP mountpoint
     rc = snprintf(extbuf, PATH_MAX, "%s/%s/UEFIESP", mountpoint, espdir);
-    if(rc<0) {
+    if(rc<0 || rc>=PATH_MAX) {
         EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
         return NULL;
     }
@@ -704,7 +704,7 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
 
     // create path for loop image
     rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", espdir, name);
-    if(rc<0) {
+    if(rc<0 || rc>=PATH_MAX) {
         EFIVARS_LOG_TRACE(rc, "Can't build name for partition image\n");
         return NULL;
     }
@@ -757,7 +757,7 @@ char* util_getmbpath_from_device(const char* device) {
 
     // build dev name
     rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
         return NULL;
     }
 
@@ -797,7 +797,8 @@ char* util_device_from_mbname(const char* name) {
             if (!bi) return NULL;
 
             rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-            if(rc<0) return NULL;
+            if(rc<0 || (size_t)rc>=sizeof(buf))
+                return NULL;
 
             return strdup(buf);
         }
@@ -812,7 +813,8 @@ char* util_fd2name(pid_t pid, int fd) {
     char procfile[PATH_MAX];
 
     rc = snprintf(procfile, sizeof(procfile), "/proc/%d/fd/%d", pid, fd);
-    if(rc<0) return NULL;
+    if(rc<0 || (size_t)rc>=sizeof(procfile))
+        return NULL;
 
     ssize_t size = readlink(procfile, buf, sizeof(buf));
     if(size<=0) return NULL;

@@ -60,7 +60,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
 
     // build UEFIESP mountpoint
     rc = snprintf(buf, PATH_MAX, "%s/%s/UEFIESP", volume->mount_point, espdir);
-    if(rc<0) {
+    if(rc<0 || rc>=PATH_MAX) {
         LOGE("Can't build name for UEFIESP\n");
         goto finish;
     }
@@ -111,7 +111,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
 
         // create path for loop image
         rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", esp_mountpoint, name);
-        if(rc<0) {
+        if(rc<0 || rc>=PATH_MAX) {
             LOGE("Can't build name for partition image\n");
             goto finish;
         }
@@ -269,7 +269,7 @@ int boot_android(void) {
             if(part) {
                 // build path
                 rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     return EFIVARS_LOG_TRACE(-1, "Can't build path for partition '%s'\n", part->name);
                 }
 
@@ -280,7 +280,7 @@ int boot_android(void) {
                 else {
                     // build loop path
                     rc = snprintf(buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
-                    if(rc<0) {
+                    if(rc<0 || (size_t)rc>=sizeof(buf2)) {
                         return EFIVARS_LOG_TRACE(rc, "Can't build path for loop device\n");
                     }
 

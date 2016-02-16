@@ -98,7 +98,7 @@ static char* efivar_getdev(void) {
 
     // try /dev/block
     rc = snprintf(buf, PATH_MAX, "/dev/block/%s", bi->devname);
-    if(rc>=0 && util_exists(buf, true)) {
+    if(rc>=0 && rc<PATH_MAX && util_exists(buf, true)) {
         return strdup(buf);
     }
 
@@ -485,7 +485,7 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
         va_end(ap);
 
         // Check error code
-        if (n < 0)
+        if (n < 0 || n>=size)
             return error;
 
         // If that worked, we're done

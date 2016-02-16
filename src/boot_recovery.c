@@ -147,7 +147,7 @@ static void dev_mb_mount_post(hookmgr_device_t* dev, unused hookmgr_mount_event_
 
         // build target dir path
         rc = snprintf(buf, sizeof(buf), "%s/media", event->target);
-        if((size_t)rc>=sizeof(buf)) {
+        if(rc<0 || (size_t)rc>=sizeof(buf)) {
             EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
             return;
         }
@@ -195,7 +195,7 @@ static void dev_mb_umount(hookmgr_device_t* dev, hookmgr_umount_event_t* event) 
         if(!strcmp(event->target, "/data")) {
             // build target dir path
             rc = snprintf(buf, sizeof(buf), "%s/media", event->target);
-            if((size_t)rc>=sizeof(buf)) {
+            if(rc<0 || (size_t)rc>=sizeof(buf)) {
                 EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
                 return;
             }
@@ -254,7 +254,7 @@ static void dev_mb_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_
 
             // build format command
             rc = snprintf(buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", pdata->partpath);
-            if((size_t)rc >= sizeof(buf)) {
+            if(rc<0 || (size_t)rc >= sizeof(buf)) {
                 EFIVARS_LOG_FATAL(-1, "Can't build format command\n");
                 return;
             }
@@ -339,7 +339,7 @@ int boot_recovery(void) {
 
             // build path
             rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-            if(rc<0) {
+            if(rc<0 || (size_t)rc>=sizeof(buf)) {
                 return EFIVARS_LOG_TRACE(-1, "Can't build path for partition '%s'\n", part->name);
             }
 
@@ -384,7 +384,7 @@ int boot_recovery(void) {
 
                 // build path for loop device
                 rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
                 }
                 loopdevice = strdup(buf);
@@ -404,13 +404,13 @@ int boot_recovery(void) {
 
                 // build path for dynfilefs mountpopint
                 rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf2)) {
                     return EFIVARS_LOG_TRACE(rc, "Can't build dynfilefs partition path\n");
                 }
 
                 // build path for dynfilefs storage file
                 rc = snprintf(buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     return EFIVARS_LOG_TRACE(rc, "Can't build dynfilefs storage path\n");
                 }
 
@@ -422,7 +422,7 @@ int boot_recovery(void) {
 
                 // build path for stub partition backup
                 rc = snprintf(buf, sizeof(buf), "%s/loop.fs", buf2);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
                 }
 
@@ -480,7 +480,7 @@ int boot_recovery(void) {
 
                 // build loop path
                 rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/mbloop_%s", part->name);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     return EFIVARS_LOG_TRACE(rc, "Can't build path for loop device\n");
                 }
                 loopdevice = strdup(buf);
@@ -591,13 +591,13 @@ int boot_recovery(void) {
 
             // build path for loop device
             rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%u:%u", bi->major, bi->minor);
-            if(rc<0) {
+            if(rc<0 || (size_t)rc>=sizeof(buf)) {
                 return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
             }
 
             // build path for temporary partition backup
             rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/loopfile:%u:%u", bi->major, bi->minor);
-            if(rc<0) {
+            if(rc<0 || (size_t)rc>=sizeof(buf2)) {
                 return EFIVARS_LOG_TRACE(rc, "Can't build temp partition path\n");
             }
 

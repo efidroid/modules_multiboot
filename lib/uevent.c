@@ -197,7 +197,7 @@ char *uevent_realpath(uevent_block_info_t *info, const char *path, char *resolve
         return NULL;
 
     rc = snprintf(resolved_path, PATH_MAX, "/dev/block/%s", bi->devname);
-    if(rc<=0)
+    if(rc<0 || rc>=PATH_MAX)
         return NULL;
 
     return resolved_path;
@@ -212,7 +212,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
 
     // build block device path
     rc = snprintf(path_block, sizeof(path_block), "%s/block", path);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(path_block)) {
         return rc;
     }
 
@@ -228,7 +228,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
 
         // build node path
         rc = snprintf(buf, sizeof(buf), "%s/%s", path_block, bi->devname);
-        if(rc<0) {
+        if(rc<0 || (size_t)rc>=sizeof(buf)) {
             return rc;
         }
 
@@ -241,7 +241,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
 
     // build devzero path
     rc = snprintf(buf, sizeof(buf), "%s/zero", path);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
         return rc;
     }
 
@@ -263,7 +263,7 @@ int uevent_mount(uevent_block_t *bi, const char *target,
 
     // build dev name
     rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-    if(rc<0) {
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
         return rc;
     }
 

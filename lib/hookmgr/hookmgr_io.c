@@ -255,7 +255,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                     trailingslash = 1;
 
                 rc = snprintf(buf, sizeof(buf), "%s%s%s", cwd, (trailingslash?"":"/"), pathnameptr);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     EFIVARS_LOG_FATAL(-1, "Can't build new path\n");
                     return TRACY_HOOK_ABORT;
                 }
@@ -285,7 +285,7 @@ int hookmgr_hook_openat(struct tracy_event *e) {
                     trailingslash = 1;
 
                 rc = snprintf(buf, sizeof(buf), "%s%s%s", (const char*)item->data, (trailingslash?"":"/"), pathnameptr);
-                if(rc<0) {
+                if(rc<0 || (size_t)rc>=sizeof(buf)) {
                     EFIVARS_LOG_FATAL(-1, "Can't build new path\n");
                     return TRACY_HOOK_ABORT;
                 }
