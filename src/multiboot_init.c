@@ -306,7 +306,6 @@ int multiboot_main(unused int argc, char** argv) {
     log_init();
 
     // mount tmpfs to MBPATH_ROOT so we'll be able to write once init mounted rootfs as RO
-    LOGD("mount %s\n", MBPATH_ROOT);
     rc = util_mount("tmpfs", MBPATH_ROOT, "tmpfs", MS_NOSUID, "mode=0755");
     if(rc) {
         LOGE("Can't mount tmpfs: %s\n", strerror(errno));
@@ -314,7 +313,6 @@ int multiboot_main(unused int argc, char** argv) {
     }
 
     // mount private sysfs
-    LOGD("mount %s\n", MBPATH_SYS);
     rc = util_mount("sysfs", MBPATH_SYS, "sysfs", 0, NULL);
     if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
@@ -322,7 +320,6 @@ int multiboot_main(unused int argc, char** argv) {
     }
 
     // mount private proc
-    LOGD("mount %s\n", MBPATH_PROC);
     rc = util_mount("proc", MBPATH_PROC, "proc", 0, NULL);
     if(rc) {
         LOGE("Can't mount sysfs: %s\n", strerror(errno));
