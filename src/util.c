@@ -655,6 +655,8 @@ out:
 char* util_get_espdir(const char* mountpoint) {
     int rc;
     char buf[PATH_MAX];
+    char buf2[PATH_MAX];
+    char* ret = NULL;
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
     if(!multiboot_data->esp) {
@@ -663,10 +665,13 @@ char* util_get_espdir(const char* mountpoint) {
 
     // get esp directory
     const char* espdir = NULL;
+    int is_datamedia = 0;
     if(multiboot_data->esp->esp[0]=='/')
         espdir = multiboot_data->esp->esp+1;
-    else if(!strcmp(multiboot_data->esp->esp, "datamedia"))
+    else if(!strcmp(multiboot_data->esp->esp, "datamedia")) {
         espdir = "media";
+        is_datamedia = 1;
+    }
     else {
         EFIVARS_LOG_TRACE(-EINVAL, "Invalid ESP path %s\n", multiboot_data->esp->esp);
         return NULL;
@@ -679,8 +684,23 @@ char* util_get_espdir(const char* mountpoint) {
         return NULL;
     }
 
-    // duplicate UEFIESP mountpoint
-    char* ret = strdup(buf);
+    if(!util_exists(buf, true) && is_datamedia) {
+        // build UEFIESP mountpoint
+        rc = snprintf(buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
+        if(rc<0 || rc>=PATH_MAX) {
+            EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
+            return NULL;
+        }
+
+        if(util_exists(buf2, true))
+            ret = strdup(buf2);
+        else
+            ret = strdup(buf);
+    }
+    else {
+        ret = strdup(buf);
+    }
+
     if(!ret) {
         EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for UEFIESP: %s\n", strerror(errno));
         return NULL;
