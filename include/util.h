@@ -45,7 +45,7 @@ int util_dd(const char *source, const char *target, unsigned long blocks);
 int util_cp(const char *source, const char *target);
 int util_shell(const char *cmd);
 char *util_get_fstype(const char *filename);
-char* util_get_espdir(const char* mountpoint, char* extbuf);
+char* util_get_espdir(const char* mountpoint);
 char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec);
 int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force);
 int util_create_partition_backup(const char* device, const char* file);

@@ -652,20 +652,14 @@ out:
     return ret;
 }
 
-char* util_get_espdir(const char* mountpoint, char* extbuf) {
+char* util_get_espdir(const char* mountpoint) {
     int rc;
     char buf[PATH_MAX];
-    int use_extbuf = 0;
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
     if(!multiboot_data->esp) {
         return NULL;
     }
-
-    if(extbuf)
-        use_extbuf = 1;
-    else
-        extbuf = buf;
 
     // get esp directory
     const char* espdir = NULL;
@@ -679,24 +673,19 @@ char* util_get_espdir(const char* mountpoint, char* extbuf) {
     }
 
     // build UEFIESP mountpoint
-    rc = snprintf(extbuf, PATH_MAX, "%s/%s/UEFIESP", mountpoint, espdir);
+    rc = snprintf(buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
     if(rc<0 || rc>=PATH_MAX) {
         EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
         return NULL;
     }
 
-    if(use_extbuf) {
-        return extbuf;
+    // duplicate UEFIESP mountpoint
+    char* ret = strdup(buf);
+    if(!ret) {
+        EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for UEFIESP: %s\n", strerror(errno));
+        return NULL;
     }
-    else {
-        // duplicate UEFIESP mountpoint
-        char* ret = strdup(extbuf);
-        if(!ret) {
-            EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for UEFIESP: %s\n", strerror(errno));
-            return NULL;
-        }
-        return ret;
-    }
+    return ret;
 }
 
 char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec) {
@@ -705,9 +694,17 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     char buf2[PATH_MAX];
 
     // get espdir
-    char* espdir = util_get_espdir(mountpoint, buf);
+    char* espdir = util_get_espdir(mountpoint);
     if(!espdir) {
         EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    // copy path
+    rc = snprintf(buf, sizeof(buf), "%s", espdir);
+    free(espdir);
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
+        EFIVARS_LOG_TRACE(rc, "Can't copy ESP dir path: %s\n", espdir);
         return NULL;
     }
 

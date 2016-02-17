@@ -89,7 +89,7 @@ static void dev_close_post(hookmgr_device_t* dev, unused hookmgr_close_event_t* 
     }
 
     // get espdir
-    char* espdir = util_get_espdir(mountpoint, NULL);
+    char* espdir = util_get_espdir(mountpoint);
     if(!espdir) {
         EFIVARS_LOG_FATAL(-1, "Can't get ESP directory: %s\n", strerror(errno));
         return;
@@ -560,9 +560,16 @@ int boot_recovery(void) {
         }
 
         // get espdir
-        char* espdir = util_get_espdir(MBPATH_ESP, buf);
+        char* espdir = util_get_espdir(MBPATH_ESP);
         if(!espdir) {
             return EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        }
+
+        // copy path
+        rc = snprintf(buf, sizeof(buf), "%s", espdir);
+        free(espdir);
+        if(rc<0 || (size_t)rc>=sizeof(buf)) {
+            return EFIVARS_LOG_TRACE(rc, "Can't copy ESP dir path: %s\n", espdir);
         }
 
         // create UEFIESP directory
