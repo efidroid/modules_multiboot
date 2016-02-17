@@ -538,3 +538,7 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
     // return error code
     return error;
 }
+
+const char* efivars_get_errorbuf(void) {
+    return errorbuf;
+}
