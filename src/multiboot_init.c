@@ -202,6 +202,11 @@ static int selinux_fixup(void) {
     // { read } for uid=0 pid=210 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
     // { getattr } for uid=0 pid=152 comm="init.multiboot" path="/data/media/UEFIESP/partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=0
     util_sepolicy_inject("kernel", "media_rw_data_file", "file", "create,write,read,open,getattr");
+    // { ioctl } for uid=0 pid=152 comm="init.multiboot" path="/dev/block/mmcblk0p31" dev="tmpfs" ino=6412 ioctlcmd=1260 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
+    // { read } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6412 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
+    // { open } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6412 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
+    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/dev/block/mmcblk0p31" dev="tmpfs" ino=6705 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=0
+    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "ioctl,read,open,getattr");
 
     // the following rules are needed for setting up UEFI partition replacements
     // { execute } for  uid=0 pid=210 comm="init.multiboot" name="busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
