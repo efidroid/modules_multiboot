@@ -447,11 +447,8 @@ int boot_recovery(void) {
                 }
 
                 // get fstype
-                char* fstype = util_get_fstype(device);
-                if(!fstype)
-                    fstype = strdup("ext4");
+                char* fstype = strdup("ext4");
                 previous_fstype = fstype;
-
 
                 // create filesystem on loop device
                 rc = util_mkfs(loopdevice, fstype);
