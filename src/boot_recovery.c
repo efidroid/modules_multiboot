@@ -456,7 +456,7 @@ int boot_recovery(void) {
                 // create filesystem on loop device
                 rc = util_mkfs(loopdevice, fstype);
                 if(rc) {
-                    return EFIVARS_LOG_TRACE(rc, "Can't create filesystem on %s\n", loopdevice);
+                    return EFIVARS_LOG_TRACE(rc, "Can't create '%s' filesystem on %s\n", fstype, loopdevice);
                 }
 
                 // mount loop device

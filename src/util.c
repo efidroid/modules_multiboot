@@ -486,7 +486,7 @@ int util_mkfs(const char *device, const char* fstype) {
     if(!strcmp(fstype, "f2fs"))
         return util_mkfs_f2fs(device);
 
-    return -1;
+    return EFIVARS_LOG_TRACE(-ENOENT, "filesystem %s is not supported\n", fstype);
 }
 
 int util_block_num(const char *path, unsigned long* numblocks)
