@@ -46,38 +46,18 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
         goto finish;
     }
 
-    // get esp directory
-    const char* espdir = NULL;
-    if(multiboot_data->esp->esp[0]=='/')
-        espdir = multiboot_data->esp->esp+1;
-    else if(!strcmp(multiboot_data->esp->esp, "datamedia"))
-        espdir = "media";
-    else {
-        LOGE("Invalid ESP path %s\n", multiboot_data->esp->esp);
-        rc = -EINVAL;
-        goto finish;
-    }
-
-    // build UEFIESP mountpoint
-    rc = snprintf(buf, PATH_MAX, "%s/%s/UEFIESP", volume->mount_point, espdir);
-    if(rc<0 || rc>=PATH_MAX) {
-        LOGE("Can't build name for UEFIESP\n");
-        goto finish;
-    }
-
-    // duplicate UEFIESP mountpoint
-    esp_mountpoint = strdup(buf);
+    // get espdir
+    esp_mountpoint = util_get_espdir(volume->mount_point);
     if(!esp_mountpoint) {
-        LOGE("Can't alloc mem for UEFIESP\n");
-        rc = -ENOMEM;
+        rc = EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
         goto finish;
     }
 
     // create UEFIESP directory
-    if(!util_exists(buf, true)) {
-        rc = util_mkdir(buf);
+    if(!util_exists(esp_mountpoint, true)) {
+        rc = util_mkdir(esp_mountpoint);
         if(rc) {
-            LOGE("Can't create directory at %s\n", buf);
+            LOGE("Can't create directory at %s\n", esp_mountpoint);
             goto finish;
         }
     }
@@ -160,6 +140,17 @@ finish:
 
     if(rc) {
         LOGE("Error in %s: %s\n", __func__, strerror(-rc));
+        const char* errorbuf = efivars_get_errorbuf();
+        if(errorbuf && errorbuf[0]!=0) {
+            LOGE(
+                "LOG TRACE:\n"
+                "===================================\n"
+                "%s"
+                "===================================\n"
+                "\n",
+                errorbuf
+            );
+        }
     }
 
     // continue trigger-postfs
