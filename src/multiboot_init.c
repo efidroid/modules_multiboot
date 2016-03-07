@@ -208,7 +208,8 @@ static int selinux_fixup(void) {
     // { read } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=7050 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
     // { ioctl } for uid=0 pid=151 comm="init.multiboot" path="/dev/block/mmcblk0p32" dev="tmpfs" ino=6424 ioctlcmd=1260 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=1
     // { open } for uid=0 pid=153 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6182 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
-    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,ioctl,open");
+    // { unlink } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6322 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
+    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,ioctl,open,unlink");
     // { write } for uid=0 pid=151 comm="init.multiboot" name="block" dev="tmpfs" ino=6217 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
     // { remove_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6424 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
     // { add_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
@@ -238,6 +239,10 @@ static int selinux_fixup(void) {
     // { create } for  uid=0 pid=157 comm="init.multiboot" name="mmcblk0p31" scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
     // { write } for  uid=0 pid=211 comm="busybox" name="mmcblk0p31" dev="tmpfs" ino=7264 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
     util_sepolicy_inject("kernel", "block_device", "blk_file", "create,write");
+    // { write } for uid=0 pid=152 comm="init.multiboot" name="/" dev="tmpfs" ino=5328 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=dir permissive=0
+    util_sepolicy_inject("kernel", "tmpfs", "dir", "write");
+    // { create } for uid=0 pid=153 comm="init.multiboot" name="replacement_backup_boot" scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=blk_file permissive=0
+    util_sepolicy_inject("kernel", "tmpfs", "blk_file", "create");
 
     // give our files some selinux context
     util_append_string_to_file("/file_contexts", "\n\n"
