@@ -20,6 +20,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #include <lib/efivars.h>
 #include <lib/mounts.h>
@@ -38,6 +39,7 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
     int i;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
+    char buf3[PATH_MAX];
     char* name = NULL;
     char* esp_mountpoint = NULL;
 
@@ -98,6 +100,28 @@ static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp)
         if(!blk_device) {
             LOGE("Can't get real path for %s\n", rec->blk_device);
             rc = -errno;
+            goto finish;
+        }
+
+        // stat original device
+        struct stat sb;
+        rc = stat(blk_device, &sb);
+        if(rc) {
+            LOGE("Can't stat device at %s\n", blk_device);
+            goto finish;
+        }
+
+        // create path for backup node
+        rc = snprintf(buf3, PATH_MAX, "%s/replacement_backup_%s", MBPATH_DEV, name);
+        if(rc<0 || rc>=PATH_MAX) {
+            LOGE("Can't build name for partition image\n");
+            goto finish;
+        }
+
+        // create backup node
+        rc = mknod(buf3, S_IRUSR | S_IWUSR | S_IFBLK, makedev(major(sb.st_rdev), minor(sb.st_rdev)));
+        if (rc) {
+            LOGE("Can't create backup node for device %s\n", buf3);
             goto finish;
         }
 
