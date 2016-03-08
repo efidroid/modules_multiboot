@@ -752,7 +752,7 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     }
 
     // create path for loop image
-    rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", espdir, name);
+    rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", buf, name);
     if(rc<0 || rc>=PATH_MAX) {
         EFIVARS_LOG_TRACE(rc, "Can't build name for partition image\n");
         return NULL;

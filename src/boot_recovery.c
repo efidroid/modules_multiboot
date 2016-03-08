@@ -586,7 +586,7 @@ int boot_recovery(void) {
         }
 
         // create UEFIESP directory
-        if(!util_exists(espdir, true)) {
+        if(!util_exists(buf, true)) {
             rc = util_mkdir(buf);
             if(rc) {
                 return EFIVARS_LOG_TRACE(rc, "Can't create directory at %s\n", buf);
