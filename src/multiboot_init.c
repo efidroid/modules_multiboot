@@ -26,7 +26,7 @@
 #include <lib/mounts.h>
 #include <lib/efivars.h>
 #include <lib/fs_mgr.h>
-#include <blkid.h>
+#include <blkid/blkid.h>
 #include <ini.h>
 
 #include <util.h>

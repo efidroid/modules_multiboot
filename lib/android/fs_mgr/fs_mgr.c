@@ -38,7 +38,7 @@
 //#include <cutils/partition_utils.h>
 //#include <cutils/properties.h>
 //#include <logwrap/logwrap.h>
-#include <blkid.h>
+#include <blkid/blkid.h>
 
 //#include "mincrypt/rsa.h"
 //#include "mincrypt/sha.h"
