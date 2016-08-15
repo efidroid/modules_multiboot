@@ -30,7 +30,7 @@
 #include <lib/log.h>
 
 static volatile sig_atomic_t usr_interrupt = 0;
-static void synch_signal(unused int sig, unused siginfo_t* info, unused void* vp) {
+static void synch_signal(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp) {
     // stop waiting for signals
     usr_interrupt = 1;
 }

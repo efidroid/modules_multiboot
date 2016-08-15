@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 
 #include <lib/klog.h>
 #include <lib/fs_mgr.h>
@@ -38,6 +39,8 @@
 #include <lib/log.h>
 
 int sepolicy_inject_main(int argc, char **argv);
+int busybox_main (int argc, char *argv[]);
+int mke2fs_main (int argc, char *argv[]);
 
 char* util_basename(const char* path) {
     // duplicate input path
@@ -208,34 +211,30 @@ int util_exec(char **args)
     return status;
 }
 
-int util_replace(const char *_file, const char *_regex)
+int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
 {
-    char *par[64];
-    int i = 0;
-    int rc;
+    pid_t pid;
+    int status = 0;
 
-    // duplicate arguments
-    char* file = strdup(_file);
-    char* regex = strdup(_regex);
-    if(!file || !regex) return -ENOMEM;
+    pid = fork();
+    if (!pid) {
+        // redirect stdout and stderr to kmsg
+        int fd = klog_get_fd();
+        dup2(fd, 1);
+        dup2(fd, 2);
 
-    // tool
-    par[i++] = MBPATH_BUSYBOX;
-    par[i++] = "sed";
-    par[i++] = "-i";
-    par[i++] = (char *)regex;
-    par[i++] = (char *)file;
+        exit(mainfn(argc, argv));
+    } else {
+        waitpid(pid, &status, 0);
+    }
 
-    // end
-    par[i++] = (char *)0;
+    return status;
+}
 
-    rc = util_exec(par);
-
-    // free arguments
-    free(file);
-    free(regex);
-
-    return rc;
+int util_replace(const char *file, const char *regex)
+{
+    const char* args[] = {"sed", "-i", regex, file, 0};
+    return util_exec_main(4, (char**)args, busybox_main);
 }
 
 static int util_sepolicy_inject_internal(const char** args) {
@@ -370,7 +369,6 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     if(!device || !file) return -ENOMEM;
 
     // tool
-    par[i++] = MBPATH_BUSYBOX;
     par[i++] = "losetup";
 
     // access mode
@@ -384,7 +382,7 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     // end
     par[i++] = (char *)0;
 
-    rc = util_exec(par);
+    rc = util_exec_main(i-1, par, busybox_main);
 
     // free arguments
     free(device);
@@ -393,114 +391,21 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     return rc;
 }
 
-int util_losetup_free(const char *_device)
+int util_losetup_free(const char *device)
 {
-    char *par[64];
-    int i = 0;
-    int rc;
-
-    // duplicate arguments
-    char* device = strdup(_device);
-    if(!device) return -ENOMEM;
-
-    // tool
-    par[i++] = MBPATH_BUSYBOX;
-    par[i++] = "losetup";
-
-    // disassociate
-    par[i++] = "-d";
-
-    // device
-    par[i++] = device;
-
-    // end
-    par[i++] = (char *)0;
-
-    rc = util_exec(par);
-
-    // free arguments
-    free(device);
-
-    return rc;
+    const char* args[] = {"losetup", "-f", device, 0};
+    return util_exec_main(3, (char**)args, busybox_main);
 }
 
-int util_mke2fs(const char *_device, const char* _fstype)
+int util_mke2fs(const char *device, const char* fstype)
 {
-    char *par[64];
-    int i = 0;
-    int rc;
-
-    // duplicate arguments
-    char* device = strdup(_device);
-    char* fstype = strdup(_fstype);
-    if(!device || !fstype) return -ENOMEM;
-
-    // tool
-    par[i++] = MBPATH_MKE2FS;
-
-    // filesystem
-    par[i++] = "-t";
-    par[i++] = fstype;
-
-    // reserved blocks
-    par[i++] = "-m";
-    par[i++] = "0";
-
-    // force
-    par[i++] = "-F";
-
-    // device
-    par[i++] = device;
-
-    // end
-    par[i++] = (char *)0;
-
-    rc = util_exec(par);
-
-    // free arguments
-    free(fstype);
-    free(device);
-
-    return rc;
-}
-
-int util_mkfs_f2fs(const char *_device)
-{
-    char *par[64];
-    int i = 0;
-    int rc;
-
-    // duplicate arguments
-    char* device = strdup(_device);
-    if(!device) return -ENOMEM;
-
-    // tool
-    par[i++] = MBPATH_MKFS_F2FS;
-
-    // discard
-    par[i++] = "-t";
-    par[i++] = "1";
-
-    // device
-    par[i++] = device;
-
-    // end
-    par[i++] = (char *)0;
-
-    rc = util_exec(par);
-
-    // free arguments
-    free(device);
-
-    return rc;
+    const char* args[] = {"mke2fs", "-t", fstype, "-m", "0", "-F", device, 0};
+    return util_exec_main(7, (char**)args, mke2fs_main);
 }
 
 int util_mkfs(const char *device, const char* fstype) {
     if(!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
         return util_mke2fs(device, fstype);
-
-    if(!strcmp(fstype, "f2fs"))
-        return util_mkfs_f2fs(device);
 
     return EFIVARS_LOG_TRACE(-ENOENT, "filesystem %s is not supported\n", fstype);
 }
@@ -536,7 +441,6 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
     }
 
     // tool
-    par[i++] = MBPATH_BUSYBOX;
     par[i++] = "dd";
 
     // input
@@ -563,7 +467,7 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
     par[i++] = (char *)0;
 
     // exec
-    rc = util_exec(par);
+    rc = util_exec_main(i-1, par, busybox_main);
 
     // cleanup
     free(buf_if);
@@ -576,63 +480,14 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
 
 int util_cp(const char *source, const char *target)
 {
-    int rc;
-    int i = 0;
-    char *par[64];
-    char *buf_source = NULL, *buf_target = NULL;
-
-    // tool
-    par[i++] = MBPATH_BUSYBOX;
-    par[i++] = "cp";
-
-    // source
-    buf_source = strdup(source);
-    par[i++] = buf_source;
-
-    // target
-    buf_target = strdup(target);
-    par[i++] = buf_target;
-
-    // end
-    par[i++] = (char *)0;
-
-    // exec
-    rc = util_exec(par);
-
-    // cleanup
-    free(buf_target);
-    free(buf_source);
-
-    return rc;
+    const char* args[] = {"cp", source, target, 0};
+    return util_exec_main(3, (char**)args, busybox_main);
 }
 
-int util_shell(const char *_cmd)
+int util_shell(const char *cmd)
 {
-    char *par[64];
-    int i = 0;
-    int rc;
-
-    // duplicate arguments
-    char* cmd = strdup(_cmd);
-    if(!cmd) return -ENOMEM;
-
-    // tool
-    par[i++] = MBPATH_BUSYBOX;
-    par[i++] = "sh";
-
-    // cmd
-    par[i++] = "-c";
-    par[i++] = cmd;
-
-    // end
-    par[i++] = (char *)0;
-
-    rc = util_exec(par);
-
-    // free arguments
-    free(cmd);
-
-    return rc;
+    const char* args[] = {"sh", "-c", cmd, 0};
+    return util_exec_main(3, (char**)args, busybox_main);
 }
 
 char *util_get_fstype(const char *filename)
@@ -886,10 +741,6 @@ multiboot_partition_t* util_mbpart_by_name(const char* name) {
     return NULL;
 }
 
-int util_strcmpnull(const char * str1, const char * str2) {
-    if(str1==NULL && str2!=NULL)
-        return -1;
-    if(str2==NULL && str1!=NULL)
-        return -1;
-    return strcmp(str1, str2);
+pid_t gettid(void) {
+    return (pid_t)syscall(SYS_gettid);
 }

@@ -54,7 +54,6 @@ int util_make_loop(const char *path);
 int util_losetup(const char *device, const char *file, bool ro);
 int util_losetup_free(const char *_device);
 int util_mke2fs(const char *device, const char* fstype);
-int util_mkfs_f2fs(const char *device);
 int util_mkfs(const char *device, const char* fstype);
 int util_block_num(const char *path, unsigned long* numblocks);
 int util_dd(const char *source, const char *target, unsigned long blocks);
@@ -70,6 +69,6 @@ int util_fs_supports_multiboot_bind(const char* type);
 char* util_device_from_mbname(const char* name);
 char* util_fd2name(pid_t pid, int fd);
 multiboot_partition_t* util_mbpart_by_name(const char* name);
-int util_strcmpnull(const char * str1, const char * str2);
+pid_t gettid(void);
 
 #endif

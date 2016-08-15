@@ -4,9 +4,6 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_PAYLOADS
     ${DEVICE_FSTAB}
-    ${TARGET_BUSYBOX_OUT}/busybox
-    ${TARGET_E2FSPROGS_OUT}/misc/mke2fs
-    ${TARGET_F2FS_TOOLS_OUT}/mkfs/mkfs.f2fs
 )
 set(CMAKE_PAYLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/files)
 set(CMAKE_PAYLOAD_OBJ ${CMAKE_PAYLOAD_DIR}.obj)
@@ -71,6 +68,9 @@ add_executable(init
     src/util.c
     src/boot_recovery.c
     src/boot_android.c
+    src/syscalls/init.c
+    src/syscalls/syscalls.c
+    src/syscalls/utils.c
 
     # libs
     lib/efivars.c
@@ -84,16 +84,16 @@ add_executable(init
     lib/android/fs_mgr/fs_mgr_fstab.c
     lib/android/init/cmdline.c
     lib/android/recovery/mounts.c
-    lib/hookmgr/hookmgr.c
-    lib/hookmgr/hookmgr_mount.c
-    lib/hookmgr/hookmgr_io.c
     lib/lk/cksum/crc32.c
 )
-target_link_libraries(init blkid uuid sepolicy-inject dynfilefs tracy inih payload fuse pthread dl)
+target_link_libraries(init
+    mke2fs e2p support com_err ext2fs
+    busybox
+    blkid uuid sepolicy-inject dynfilefs syshook inih payload fuse pthread dl
+)
 include_directories(
     include
     lib/android/include
     lib/android/fs_mgr/include
     lib/lk/include
-    lib/hookmgr/include
 )

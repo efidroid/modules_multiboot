@@ -27,6 +27,8 @@
 
 #include <sys/cdefs.h>
 #include <stdarg.h>
+#include <unistd.h>
+#include <util.h>
 
 __BEGIN_DECLS
 
@@ -55,12 +57,12 @@ __END_DECLS
 #define LOG_TAG_STR(tag) tag
 #endif
 
-#define LOGV(x...) log_write(LOGV_LEVEL, "V/" LOG_TAG_STR(LOG_TAG) ": " x)
-#define LOGD(x...) log_write(LOGD_LEVEL, "D/" LOG_TAG_STR(LOG_TAG) ": " x)
-#define LOGI(x...) log_write(LOGI_LEVEL, "I/" LOG_TAG_STR(LOG_TAG) ": " x)
-#define LOGW(x...) log_write(LOGW_LEVEL, "W/" LOG_TAG_STR(LOG_TAG) ": " x)
-#define LOGE(x...) log_write(LOGE_LEVEL, "E/" LOG_TAG_STR(LOG_TAG) ": " x)
-#define LOGA(x...) log_write(LOGA_LEVEL, "A/" LOG_TAG_STR(LOG_TAG) ": " x)
+#define LOGV(fmt, ...) log_write(LOGV_LEVEL, "V/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define LOGD(fmt, ...) log_write(LOGD_LEVEL, "D/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define LOGI(fmt, ...) log_write(LOGI_LEVEL, "I/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define LOGW(fmt, ...) log_write(LOGW_LEVEL, "W/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define LOGE(fmt, ...) log_write(LOGE_LEVEL, "E/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define LOGA(fmt, ...) log_write(LOGA_LEVEL, "A/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
 
 #define LOG_DEFAULT_LEVEL  LOGD_LEVEL  /* messages >= this level are logged */
 

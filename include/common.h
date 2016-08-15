@@ -20,7 +20,8 @@
 #include <stdint.h>
 
 #include <lib/uevent.h>
-#include <tracy.h>
+#include <lib/list.h>
+#include <syshook.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 
@@ -43,13 +44,10 @@
 #define MBPATH_STUB MBPATH_ROOT "/stub"
 #define MBPATH_DATA MBPATH_ROOT "/data"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
-#define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
-#define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"
-#define MBPATH_MKFS_F2FS MBPATH_BIN "/mkfs.f2fs"
 #define MBPATH_TRIGGER_POSTFS_DATA MBPATH_BIN "/trigger-postfs-data"
 #define POSTFS_NOTIFICATION_FILE "/dev/.trigger-postfs-data"
 
-#define unused __attribute__((unused))
+#define UNUSED __attribute__((unused))
 
 extern size_t strlcat(char* __restrict, const char* __restrict, size_t);
 extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
@@ -81,10 +79,39 @@ typedef struct {
     struct fstab *romfstab;
     char* romfstabpath;
 
+    // partition replacement list
+    list_node_t replacements;
+
 } multiboot_data_t;
 
-int run_init(struct tracy *tracy);
+typedef struct {
+    list_node_t node;
+    pthread_mutex_t lock;
+
+    unsigned major;
+    unsigned minor;
+
+    // raw part for loop, stub part for bind
+    char* loopdevice;
+
+    union {
+        struct {
+            multiboot_partition_t* part;
+
+            // bind
+            char* partpath;
+        } multiboot;
+
+        struct {
+            struct fstab_rec* rec;
+        } native;
+    } u;
+} part_replacement_t;
+
+
+int run_init(int trace);
 int multiboot_main(int argc, char** argv);
+int multiboot_exec_tracee(char** par);
 multiboot_data_t* multiboot_get_data(void);
 int boot_recovery(void);
 int boot_android(void);

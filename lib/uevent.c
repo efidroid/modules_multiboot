@@ -267,6 +267,18 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
         return rc;
     }
 
+    // build devnull path
+    rc = snprintf(buf, sizeof(buf), "%s/null", path);
+    if(rc<0 || (size_t)rc>=sizeof(buf)) {
+        return rc;
+    }
+
+    // create devnull node
+    rc = mknod(buf, S_IFCHR | 0666, makedev(1, 3));
+    if(rc<0) {
+        return rc;
+    }
+
     return 0;
 }
 

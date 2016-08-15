@@ -21,6 +21,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 
 #include <lib/cmdline.h>
 #include <lib/mounts.h>
@@ -137,7 +138,7 @@ static int device_matches(const char* path, const char* guid) {
     return rc;
 }
 
-int run_init(struct tracy *tracy)
+int run_init(int trace)
 {
     char *par[2];
     int i = 0, ret = 0;
@@ -146,15 +147,15 @@ int run_init(struct tracy *tracy)
     par[i++] = "/init";
     par[i++] = (char *)0;
 
-    // close all file handles
-    int fd;
-    for(fd=0; fd<10; fd++)
-        close(fd);
-
     // RUN
-    if (tracy)
-        ret = !tracy_exec(tracy, par);
+    if (trace){
+        ret = multiboot_exec_tracee(par);
+    }
     else {
+        // close all file handles
+        int fd;
+        for(fd=0; fd<10; fd++)
+            close(fd);
         ret = execve(par[0], par, NULL);
     }
 
@@ -259,7 +260,7 @@ static int selinux_fixup(void) {
     return rc;
 }
 
-static int mbini_count_handler(unused void* user, const char* section, unused const char* name, unused const char* value) {
+static int mbini_count_handler(UNUSED void* user, const char* section, UNUSED const char* name, UNUSED const char* value) {
     // we're interested in partitions only
     if(strcmp(section, "partitions"))
         return 1;
@@ -269,16 +270,17 @@ static int mbini_count_handler(unused void* user, const char* section, unused co
     return 1;
 }
 
-static int mbini_handler(unused void* user, const char* section, const char* name, const char* value) {
+static int mbini_handler(UNUSED void* user, const char* section, const char* name, const char* value) {
     uint32_t* index = user;
-
-    if((*index)>=multiboot_data.num_mbparts) {
-        EFIVARS_LOG_TRACE(-ENOMEM, "Too many partitions\n");
-    }
 
     // we're interested in partitions only
     if(strcmp(section, "partitions"))
         return 1;
+
+    if((*index)>=multiboot_data.num_mbparts) {
+        EFIVARS_LOG_TRACE(-ENOMEM, "Too many partitions: %d>=%d\n", (*index), multiboot_data.num_mbparts);
+        return 0;
+    }
 
     // validate args
     if(!name || !value) {
@@ -323,10 +325,13 @@ multiboot_partition_t* multiboot_part_by_name(const char* name) {
     return NULL;
 }
 
-int multiboot_main(unused int argc, char** argv) {
+int multiboot_main(UNUSED int argc, char** argv) {
     int rc = 0;
     int i;
     char buf[PATH_MAX];
+
+    // basic multiboot_data init
+    list_initialize(&multiboot_data.replacements);
 
     // init logging
     log_init();
@@ -396,27 +401,6 @@ int multiboot_main(unused int argc, char** argv) {
     rc = util_buf2file(PAYLOAD_PTR(fstab_multiboot), MBPATH_FSTAB, PAYLOAD_SIZE(fstab_multiboot));
     if(rc) {
         return EFIVARS_LOG_TRACE(rc, "Can't extract fstab to "MBPATH_FSTAB": %s\n", strerror(errno));
-    }
-
-    // extract busybox
-    LOGD("extract %s\n", MBPATH_BUSYBOX);
-    rc = util_extractbin(PAYLOAD_PTR(busybox), MBPATH_BUSYBOX, PAYLOAD_SIZE(busybox));
-    if(rc) {
-        return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_BUSYBOX": %s\n", strerror(errno));
-    }
-
-    // extract mke2fs
-    LOGD("extract %s\n", MBPATH_MKE2FS);
-    rc = util_extractbin(PAYLOAD_PTR(mke2fs), MBPATH_MKE2FS, PAYLOAD_SIZE(mke2fs));
-    if(rc) {
-        return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
-    }
-
-    // extract mkfs.f2fs
-    LOGD("extract %s\n", MBPATH_MKFS_F2FS);
-    rc = util_extractbin(PAYLOAD_PTR(mkfs_f2fs), MBPATH_MKFS_F2FS, PAYLOAD_SIZE(mkfs_f2fs));
-    if(rc) {
-        return EFIVARS_LOG_TRACE(rc, "Can't extract busybox to "MBPATH_MKE2FS": %s\n", strerror(errno));
     }
 
     // create symlinks

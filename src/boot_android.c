@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <stdio.h>
 
 #include <lib/efivars.h>
 #include <lib/mounts.h>
@@ -34,7 +35,7 @@
 static multiboot_data_t* multiboot_data = NULL;
 
 static volatile sig_atomic_t mbinit_usr_interrupt = 0;
-static void mbinit_usr_handler(unused int sig, siginfo_t* info, unused void* vp) {
+static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp) {
     int rc;
     int i;
     char buf[PATH_MAX];
@@ -198,7 +199,7 @@ finish:
 }
 
 static volatile sig_atomic_t init_usr_interrupt = 0;
-static void init_usr_handler(unused int sig, unused siginfo_t* info, unused void* vp) {
+static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp) {
     // stop waiting for signals
     init_usr_interrupt = 1;
 }
@@ -235,7 +236,7 @@ int boot_android(void) {
             // wait for mbinit to finish
             WAIT_FOR_SIGNAL(SIGUSR1, !init_usr_interrupt);
 
-            return run_init(NULL);
+            return run_init(0);
         }
 
         // child
@@ -354,6 +355,6 @@ int boot_android(void) {
         // close file
         close(fd);
 
-        return run_init(NULL);
+        return run_init(0);
     }
 }
