@@ -422,6 +422,32 @@ int multiboot_main(UNUSED int argc, char** argv) {
         return EFIVARS_LOG_TRACE(rc, "Can't create symlink "MBPATH_TRIGGER_POSTFS_DATA": %s\n", strerror(errno));
     }
 
+    if(util_exists(MBPATH_BUSYBOX, false)) {
+        LOGV("delete %s\n", MBPATH_BUSYBOX);
+        rc = unlink(MBPATH_BUSYBOX);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Error deleting "MBPATH_BUSYBOX": %s\n", strerror(errno));
+        }
+    }
+    LOGV("create symlink %s->%s\n", MBPATH_BUSYBOX, argv[0]);
+    rc = symlink(argv[0], MBPATH_BUSYBOX);
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't create symlink "MBPATH_BUSYBOX": %s\n", strerror(errno));
+    }
+
+    if(util_exists(MBPATH_MKE2FS, false)) {
+        LOGV("delete %s\n", MBPATH_MKE2FS);
+        rc = unlink(MBPATH_MKE2FS);
+        if(rc) {
+            return EFIVARS_LOG_TRACE(rc, "Error deleting "MBPATH_MKE2FS": %s\n", strerror(errno));
+        }
+    }
+    LOGV("create symlink %s->%s\n", MBPATH_MKE2FS, argv[0]);
+    rc = symlink(argv[0], MBPATH_MKE2FS);
+    if(rc) {
+        return EFIVARS_LOG_TRACE(rc, "Can't create symlink "MBPATH_MKE2FS": %s\n", strerror(errno));
+    }
+
     // parse multiboot fstab
     LOGD("parse %s\n", MBPATH_FSTAB);
     multiboot_data.mbfstab = fs_mgr_read_fstab(MBPATH_FSTAB);

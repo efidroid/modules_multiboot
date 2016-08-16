@@ -365,7 +365,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
             close(fd);
 
             // build format command
-            rc = snprintf(buf, sizeof(buf), "/init.multiboot busybox rm -Rf %s/*", replacement->u.multiboot.partpath);
+            rc = snprintf(buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->u.multiboot.partpath);
             if(rc<0 || (size_t)rc >= sizeof(buf)) {
                 EFIVARS_LOG_FATAL(-1, "Can't build format command\n");
                 return -1;

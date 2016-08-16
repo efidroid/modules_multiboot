@@ -35,6 +35,10 @@
     sigprocmask (SIG_UNBLOCK, &mask, NULL); \
 }
 
+int sepolicy_inject_main(int argc, char **argv);
+int busybox_main(int argc, char *argv[]);
+int mke2fs_main(int argc, char *argv[]);
+
 char* util_basename(const char* path);
 char* util_dirname(const char* path);
 int util_buf2file(const void* buf, const char* filename, size_t size);

@@ -38,10 +38,6 @@
 #define LOG_TAG "UTIL"
 #include <lib/log.h>
 
-int sepolicy_inject_main(int argc, char **argv);
-int busybox_main (int argc, char *argv[]);
-int mke2fs_main (int argc, char *argv[]);
-
 char* util_basename(const char* path) {
     // duplicate input path
     char* str = strdup(path);

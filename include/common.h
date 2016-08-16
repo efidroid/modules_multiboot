@@ -45,6 +45,8 @@
 #define MBPATH_DATA MBPATH_ROOT "/data"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
 #define MBPATH_TRIGGER_POSTFS_DATA MBPATH_BIN "/trigger-postfs-data"
+#define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
+#define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"
 #define POSTFS_NOTIFICATION_FILE "/dev/.trigger-postfs-data"
 
 #define UNUSED __attribute__((unused))

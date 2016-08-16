@@ -63,6 +63,12 @@ int main(int argc, char** argv) {
     if(!strcmp(argv[0], MBPATH_TRIGGER_POSTFS_DATA)) {
         return trigger_postfsdata_main(argc, argv);
     }
+    else if(!strcmp(argv[0], MBPATH_MKE2FS)) {
+        return mke2fs_main(argc, argv);
+    }
+    else if(!strcmp(argv[0], MBPATH_BUSYBOX)) {
+        return busybox_main(argc, argv);
+    }
     else {
         int rc = multiboot_main(argc, argv);
         if(rc) {
