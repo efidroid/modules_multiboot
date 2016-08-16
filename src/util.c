@@ -219,6 +219,9 @@ int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
         dup2(fd, 1);
         dup2(fd, 2);
 
+        optind = 1;
+        opterr = 1;
+        optopt = '?';
         exit(mainfn(argc, argv));
     } else {
         waitpid(pid, &status, 0);
