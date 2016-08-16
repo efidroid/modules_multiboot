@@ -107,21 +107,6 @@ err_close:
     return rc;
 }
 
-int util_extractbin(const void* buf, const char* filename, size_t size) {
-    int rc;
-
-    rc = util_buf2file(buf, filename, size);
-    if(rc) {
-        return rc;
-    }
-    rc = chmod(filename, 0755);
-    if(rc) {
-        return rc;
-    }
-
-    return rc;
-}
-
 int util_exists(const char *filename, bool follow) {
     struct stat buffer;
     int rc;
@@ -186,27 +171,6 @@ done:
     return rc;
 }
 
-int util_exec(char **args)
-{
-    pid_t pid;
-    int status = 0;
-
-    pid = fork();
-    if (!pid) {
-        // redirect stdout and stderr to kmsg
-        int fd = klog_get_fd();
-        dup2(fd, 1);
-        dup2(fd, 2);
-
-        execve(args[0], args, NULL);
-        exit(0);
-    } else {
-        waitpid(pid, &status, 0);
-    }
-
-    return status;
-}
-
 int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
 {
     pid_t pid;
@@ -228,12 +192,6 @@ int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
     }
 
     return status;
-}
-
-int util_replace(const char *file, const char *regex)
-{
-    const char* args[] = {"sed", "-i", regex, file, 0};
-    return util_exec_main(4, (char**)args, busybox_main);
 }
 
 static int util_sepolicy_inject_internal(const char** args) {
@@ -396,7 +354,7 @@ int util_losetup_free(const char *device)
     return util_exec_main(3, (char**)args, busybox_main);
 }
 
-int util_mke2fs(const char *device, const char* fstype)
+static int util_mke2fs(const char *device, const char* fstype)
 {
     const char* args[] = {"mke2fs", "-t", fstype, "-m", "0", "-F", device, 0};
     return util_exec_main(7, (char**)args, mke2fs_main);
@@ -708,22 +666,6 @@ char* util_device_from_mbname(const char* name) {
     }
 
     return NULL;
-}
-
-char* util_fd2name(pid_t pid, int fd) {
-    int rc;
-    char buf[PATH_MAX];
-    char procfile[PATH_MAX];
-
-    rc = snprintf(procfile, sizeof(procfile), "/proc/%d/fd/%d", pid, fd);
-    if(rc<0 || (size_t)rc>=sizeof(procfile))
-        return NULL;
-
-    ssize_t size = readlink(procfile, buf, sizeof(buf));
-    if(size<=0) return NULL;
-    if(size==sizeof(buf)) buf[size-1] = 0;
-
-    return strdup(buf);
 }
 
 multiboot_partition_t* util_mbpart_by_name(const char* name) {
