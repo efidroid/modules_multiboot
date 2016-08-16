@@ -177,7 +177,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
     }
 
     // bind
-    if(replacement->u.multiboot.part->is_bind) {
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND) {
         // copy dir_name to our space
         kdirname[0] = 0;
         syshook_strncpy_user(process, kdirname, dir_name, sizeof(kdirname));
@@ -277,7 +277,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
     }
 
     // unmount datamedia
-    if(replacement->u.multiboot.part->is_bind && !strcmp(replacement->u.multiboot.part->name, "data")) {
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND && !strcmp(replacement->u.multiboot.part->name, "data")) {
         // scan mounted volumes
         rc = scan_mounted_volumes();
         if(rc) {

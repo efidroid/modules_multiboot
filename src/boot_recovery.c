@@ -106,11 +106,11 @@ int boot_recovery(void) {
 
             // check node type
             if(!rc && (
-                        (part->is_bind && !S_ISDIR(sb.st_mode)) ||
-                        (!part->is_bind && !S_ISREG(sb.st_mode))
+                        (part->type==MBPART_TYPE_BIND && !S_ISDIR(sb.st_mode)) ||
+                        (part->type!=MBPART_TYPE_BIND && !S_ISREG(sb.st_mode))
                     )
               ) {
-                return EFIVARS_LOG_TRACE(-1, "path '%s'(bind=%d) has invalid type: %x\n", partpath, part->is_bind, sb.st_mode);
+                return EFIVARS_LOG_TRACE(-1, "path '%s'(type=%d) has invalid mode: %x\n", partpath, part->type, sb.st_mode);
             }
 
             // get real device
@@ -120,7 +120,7 @@ int boot_recovery(void) {
                 return EFIVARS_LOG_TRACE(-1, "Can't get device for '%s'\n", part->name);
             }
 
-            if(part->is_bind) {
+            if(part->type==MBPART_TYPE_BIND) {
                 // create directory
                 if(rc==-ENOENT) {
                     rc = util_mkdir(partpath);

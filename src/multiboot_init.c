@@ -292,7 +292,7 @@ static int mbini_handler(UNUSED void* user, const char* section, const char* nam
     multiboot_partition_t* part = &multiboot_data.mbparts[(*index)++];
     part->name = strdup(name);
     part->path = strdup(value);
-    part->is_bind = 1;
+    part->type = MBPART_TYPE_BIND;
 
     // validate duplicated strings
     if(!part->name || !part->path) {
@@ -300,10 +300,15 @@ static int mbini_handler(UNUSED void* user, const char* section, const char* nam
         return 1;
     }
 
-    // check if it's a bind mount
+    // determine partition type
     int pathlen = strlen(part->path);
-    if(pathlen>=4 && !strcmp(part->path+pathlen-4, ".img"))
-        part->is_bind = 0;
+    if(pathlen>=4) {
+        const char* ext = part->path+pathlen-4;
+        if(!strcmp(ext, ".img"))
+            part->type = MBPART_TYPE_LOOP;
+        else if(!strcmp(ext, ".dyn"))
+            part->type = MBPART_TYPE_DYN;
+    }
 
     // inih defines 1 as OK
     return 1;
@@ -604,15 +609,18 @@ int multiboot_main(UNUSED int argc, char** argv) {
                 return EFIVARS_LOG_TRACE(-ENOENT, "Can't find multiboot partition for '%s': %s\n", rec->mount_point, strerror(errno));
             }
 
-            // check if bind support is needed
-            if(part->is_bind && !multiboot_data.bootdev_supports_bindmount) {
-                return EFIVARS_LOG_TRACE(-1, "Boot device doesn't support bind mounts\n");
+            if(part->type==MBPART_TYPE_BIND) {
+                // check if bootdev supports bind mounts
+                if(!multiboot_data.bootdev_supports_bindmount)
+                    return EFIVARS_LOG_TRACE(-1, "Boot device doesn't support bind mounts\n");
+
+                // check if this should be a raw partition
+                if(!strcmp(rec->fs_type, "emmc")) {
+                    return EFIVARS_LOG_TRACE(-1, "raw device %s doesn't support bind mounts\n", rec->blk_device);
+                }
             }
 
-            // check if bind support is needed
-            if(part->is_bind && !strcmp(rec->fs_type, "emmc")) {
-                return EFIVARS_LOG_TRACE(-1, "raw device %s doesn't support bind mounts\n", rec->blk_device);
-            }
+
         }
     }
 

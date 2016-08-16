@@ -52,10 +52,16 @@
 extern size_t strlcat(char* __restrict, const char* __restrict, size_t);
 extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
 
+typedef enum {
+    MBPART_TYPE_LOOP = 0,
+    MBPART_TYPE_DYN,
+    MBPART_TYPE_BIND,
+} multiboot_partition_type_t;
+
 typedef struct {
     char* name;
     char* path;
-    int is_bind;
+    multiboot_partition_type_t type;
 } multiboot_partition_t;
 
 typedef struct {

@@ -345,7 +345,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
     int rc;
     char buf[PATH_MAX];
 
-    if(replacement->u.multiboot.part->is_bind) {
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND) {
         // mount loop
         rc = util_mount(replacement->loopdevice, MBPATH_STUB, NULL, 0, NULL);
         if(rc) {

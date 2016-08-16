@@ -305,7 +305,7 @@ int boot_android(void) {
                     return EFIVARS_LOG_TRACE(-1, "Can't build path for partition '%s'\n", part->name);
                 }
 
-                if(part->is_bind) {
+                if(part->type==MBPART_TYPE_BIND) {
                     blk_device = buf;
                     mnt_flags = "bind";
                 }
