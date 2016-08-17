@@ -39,8 +39,7 @@
 
 char* util_basename(const char* path) {
     // duplicate input path
-    char* str = strdup(path);
-    if(!str) return NULL;
+    char* str = safe_strdup(path);
 
     // get basename
     char* bname = basename(str);
@@ -50,7 +49,7 @@ char* util_basename(const char* path) {
     }
 
     // duplicate return value
-    char* ret = strdup(bname);
+    char* ret = safe_strdup(bname);
 
     // cleanup input path
     free(str);
@@ -61,8 +60,7 @@ char* util_basename(const char* path) {
 
 char* util_dirname(const char* path) {
     // duplicate input path
-    char* str = strdup(path);
-    if(!str) return NULL;
+    char* str = safe_strdup(path);
 
     // get dirname
     char* dname = dirname(str);
@@ -72,7 +70,7 @@ char* util_dirname(const char* path) {
     }
 
     // duplicate return value
-    char* ret = strdup(dname);
+    char* ret = safe_strdup(dname);
 
     // cleanup input path
     free(str);
@@ -202,9 +200,9 @@ static int util_sepolicy_inject_internal(const char** args) {
         argc++;
 
     char** seargs = malloc(sizeof(char*)*argc+1);
-    seargs[0] = strdup("sepolicy_inject");
+    seargs[0] = safe_strdup("sepolicy_inject");
     for(i=0; i<argc; i++) {
-        seargs[i+1] = strdup(args[i]);
+        seargs[i+1] = safe_strdup(args[i]);
         if(!seargs[i+1]) return -ENOMEM;
     }
 
@@ -322,9 +320,8 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     int rc;
 
     // duplicate arguments
-    char* device = strdup(_device);
-    char* file = strdup(_file);
-    if(!device || !file) return -ENOMEM;
+    char* device = safe_strdup(_device);
+    char* file = safe_strdup(_file);
 
     // tool
     par[i++] = "losetup";
@@ -404,22 +401,22 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
 
     // input
     snprintf(buf, ARRAY_SIZE(buf), "if=%s", source);
-    buf_if = strdup(buf);
+    buf_if = safe_strdup(buf);
     par[i++] = buf_if;
 
     // output
     snprintf(buf, ARRAY_SIZE(buf), "of=%s", target);
-    buf_of = strdup(buf);
+    buf_of = safe_strdup(buf);
     par[i++] = buf_of;
 
     // blocksize (get_blknum returns 512byte blocks)
     snprintf(buf, ARRAY_SIZE(buf), "bs=%d", 512);
-    buf_bs = strdup(buf);
+    buf_bs = safe_strdup(buf);
     par[i++] = buf_bs;
 
     // count
     snprintf(buf, ARRAY_SIZE(buf), "count=%lu", blocks);
-    buf_count = strdup(buf);
+    buf_count = safe_strdup(buf);
     par[i++] = buf_count;
 
     // end
@@ -473,7 +470,7 @@ char *util_get_fstype(const char *filename)
     }
 
     // copy string
-    ret = strdup(type);
+    ret = safe_strdup(type);
 
 out:
     // free probe
@@ -517,12 +514,12 @@ char* util_get_espdir(const char* mountpoint) {
         CHECK_SNPRINTF_RET(rc, sizeof(buf2), LOGE, NULL);
 
         if(util_exists(buf2, true))
-            ret = strdup(buf2);
+            ret = safe_strdup(buf2);
         else
-            ret = strdup(buf);
+            ret = safe_strdup(buf);
     }
     else {
-        ret = strdup(buf);
+        ret = safe_strdup(buf);
     }
 
     if(!ret) {
@@ -561,13 +558,7 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     CHECK_SNPRINTF_RET(rc, sizeof(buf2), LOGE, NULL);
 
     // duplicate buffer
-    char* ret = strdup(buf2);
-    if(!ret) {
-        LOGE("Can't alloc mem for partition name: %s\n", strerror(errno));
-        return NULL;
-    }
-
-    return ret;
+    return safe_strdup(buf2);
 }
 
 int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force) {
@@ -613,7 +604,7 @@ char* util_getmbpath_from_device(const char* device) {
         return NULL;
     }
 
-    return strdup(buf);
+    return safe_strdup(buf);
 }
 
 static const char* multiboot_bind_whitelist[] = {
@@ -652,7 +643,7 @@ char* util_device_from_mbname(const char* name) {
             if(rc<0 || (size_t)rc>=sizeof(buf))
                 return NULL;
 
-            return strdup(buf);
+            return safe_strdup(buf);
         }
     }
 

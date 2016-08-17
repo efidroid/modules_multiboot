@@ -22,6 +22,7 @@
 #include <lib/uevent.h>
 #include <lib/list.h>
 #include <syshook.h>
+#include <safe.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 
