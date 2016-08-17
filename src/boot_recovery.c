@@ -183,10 +183,7 @@ int boot_recovery(void) {
                 close(fd);
 
                 // unmount loop device
-                rc = umount(MBPATH_STUB);
-                if(rc) {
-                    MBABORT("Can't unmount %s: %s\n", MBPATH_STUB, strerror(errno));
-                }
+                SAFE_UMOUNT(MBPATH_STUB);
             }
 
             else {
@@ -349,10 +346,7 @@ int boot_recovery(void) {
         }
 
         // unmount ESP
-        rc = umount(MBPATH_ESP);
-        if(rc) {
-            MBABORT("Can't unmount ESP: %s\n", strerror(errno));
-        }
+        SAFE_UMOUNT(MBPATH_ESP);
     }
 
     // run and trace init

@@ -33,6 +33,12 @@
     } \
 }while(0)
 
+#define SAFE_UMOUNT(target) do{ \
+    if(umount(target)) { \
+        MBABORT("can't unmount %s: %s\n", target, strerror(errno)); \
+    } \
+}while(0)
+
 char *safe_strdup(const char *s);
 pid_t safe_fork(void);
 void* safe_malloc(size_t size);
