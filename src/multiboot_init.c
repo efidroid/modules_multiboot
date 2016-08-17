@@ -76,7 +76,7 @@ static void import_kernel_nv(char *name)
             return;
         }
 
-        multiboot_data.guid = strdup(guid);
+        multiboot_data.guid = safe_strdup(guid);
         multiboot_data.path = path;
     }
 
@@ -91,7 +91,7 @@ static void import_kernel_nv(char *name)
     }
 
     else if (!strcmp(name, "androidboot.hardware")) {
-        multiboot_data.hwname = strdup(value);
+        multiboot_data.hwname = safe_strdup(value);
     }
 }
 
@@ -286,15 +286,9 @@ static int mbini_handler(UNUSED void* user, const char* section, const char* nam
 
     // setup partition
     multiboot_partition_t* part = &multiboot_data.mbparts[(*index)++];
-    part->name = strdup(name);
-    part->path = strdup(value);
+    part->name = safe_strdup(name);
+    part->path = safe_strdup(value);
     part->type = MBPART_TYPE_BIND;
-
-    // validate duplicated strings
-    if(!part->name || !part->path) {
-        MBABORT("Can't duplicate strings\n");
-        return 1;
-    }
 
     // determine partition type
     int pathlen = strlen(part->path);
@@ -452,11 +446,8 @@ int multiboot_main(UNUSED int argc, char** argv) {
     }
 
     // build fstab name
-    rc = snprintf(buf, sizeof(buf), "/fstab.%s", multiboot_data.hwname);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        MBABORT("Can't build fstab name: %s\n", strerror(errno));
-    }
-    multiboot_data.romfstabpath = strdup(buf);
+    SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "/fstab.%s", multiboot_data.hwname);
+    multiboot_data.romfstabpath = safe_strdup(buf);
 
     // parse ROM fstab
     LOGD("parse ROM fstab: %s\n", buf);
@@ -470,7 +461,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
         LOGD("parse /etc/twrp.fstab\n");
         multiboot_data.romfstab = fs_mgr_read_fstab("/etc/twrp.fstab");
         if(multiboot_data.romfstab) {
-            multiboot_data.romfstabpath = strdup("/etc/twrp.fstab");
+            multiboot_data.romfstabpath = safe_strdup("/etc/twrp.fstab");
         }
     }
 
@@ -500,7 +491,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
         for(i=0; i<multiboot_data.blockinfo->num_entries; i++) {
             uevent_block_t *event = &multiboot_data.blockinfo->entries[i];
 
-            snprintf(buf, sizeof(buf), "/dev/block/%s", event->devname);
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "/dev/block/%s", event->devname);
             if(device_matches(buf, multiboot_data.guid)) {
                 multiboot_data.bootdev = event;
                 break;
@@ -591,10 +582,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
         }
 
         // build multiboot.ini filename
-        rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s", multiboot_data.path);
-        if(rc<0 || (size_t)rc>=sizeof(buf)) {
-            MBABORT("Can't build multiboot.ini path: %s\n", strerror(errno));
-        }
+        SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s", multiboot_data.path);
 
         // count partitions in multiboot.ini
         LOGD("parse %s using mbini_count_handler\n", buf);
@@ -604,7 +592,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
         }
 
         // allocate mbparts array
-        multiboot_data.mbparts = calloc(sizeof(multiboot_partition_t), multiboot_data.num_mbparts);
+        multiboot_data.mbparts = safe_calloc(sizeof(multiboot_partition_t), multiboot_data.num_mbparts);
         if(!multiboot_data.mbparts) {
             MBABORT("Can't allocate multiboot partitions array: %s\n", strerror(errno));
         }
