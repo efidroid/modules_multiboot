@@ -194,7 +194,7 @@ static int util_sepolicy_inject_internal(const char** args) {
     while(*argptr++)
         argc++;
 
-    char** seargs = malloc(sizeof(char*)*argc+1);
+    char** seargs = safe_malloc(sizeof(char*)*argc+1);
     seargs[0] = safe_strdup("sepolicy_inject");
     for(i=0; i<argc; i++) {
         seargs[i+1] = safe_strdup(args[i]);
