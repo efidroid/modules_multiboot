@@ -83,7 +83,7 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     // get absolute path
     rc = syshookutils_get_absolute_path(process, dfd, kfilename, abspath, sizeof(abspath));
     if(rc) {
-        EFIVARS_LOG_FATAL(rc, "can't get absolute path\n");
+        MBABORT("can't get absolute path\n");
         return -1;
     }
 
@@ -104,7 +104,7 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     uabspath_len = strlen(replacement->loopdevice)+1;
     uabspath = syshookutils_copy_to_child(process, replacement->loopdevice, uabspath_len);
     if(!uabspath) {
-        EFIVARS_LOG_FATAL(rc, "can't copy path to child\n");
+        MBABORT("can't copy path to child\n");
         return -1;
     }
 
@@ -192,7 +192,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             // build target dir path
             rc = snprintf(buf, sizeof(buf), "%s/media", kdirname);
             if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
+                MBABORT("Can't build path for datamedia\n");
                 return -1;
             }
 
@@ -200,7 +200,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             if(!util_exists(MBPATH_DATA"/media", false)) {
                 rc = util_mkdir(MBPATH_DATA"/media");
                 if(rc) {
-                    EFIVARS_LOG_FATAL(rc, "Can't create datamedia on source: %s\n", strerror(rc));
+                    MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
                     return -1;
                 }
             }
@@ -209,7 +209,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             if(!util_exists(buf, false)) {
                 rc = util_mkdir(buf);
                 if(rc) {
-                    EFIVARS_LOG_FATAL(rc, "Can't create datamedia on target: %s\n", strerror(rc));
+                    MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
                     return -1;
                 }
             }
@@ -217,7 +217,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             // bind mount
             rc = mount(MBPATH_DATA"/media", buf, NULL, MS_BIND, NULL);
             if(rc) {
-                EFIVARS_LOG_FATAL(rc, "Can't bind mount datamedia: %s\n", strerror(errno));
+                MBABORT("Can't bind mount datamedia: %s\n", strerror(errno));
                 return -1;
             }
         }
@@ -231,7 +231,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         udevname_len = strlen(replacement->loopdevice)+1;
         udevname = syshookutils_copy_to_child(process, replacement->loopdevice, udevname_len);
         if(!udevname) {
-            EFIVARS_LOG_FATAL(rc, "can't copy path to child\n");
+            MBABORT("can't copy path to child\n");
             return -1;
         }
 
@@ -280,7 +280,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
         // scan mounted volumes
         rc = scan_mounted_volumes();
         if(rc) {
-            EFIVARS_LOG_FATAL(rc, "Can't scan mounted volumes: %s\n", strerror(errno));
+            MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
             return -1;
         }
 
@@ -288,7 +288,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
             // build target dir path
             rc = snprintf(buf, sizeof(buf), "%s/media", kname);
             if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                EFIVARS_LOG_FATAL(-ENOMEM, "Can't build path for datamedia\n");
+                MBABORT("Can't build path for datamedia\n");
                 return -1;
             }
 
@@ -298,7 +298,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
                 LOGV("unmount datamedia for %s\n", kname);
                 rc = umount(buf);
                 if(rc) {
-                    EFIVARS_LOG_FATAL(-ENOMEM, "Can't unmount datamedia for %s\n", kname);
+                    MBABORT("Can't unmount datamedia for %s\n", kname);
                     return -1;
                 }
             }

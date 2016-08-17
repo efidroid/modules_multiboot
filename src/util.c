@@ -165,7 +165,7 @@ int util_mkdir(const char *dir) {
 
 done:
     if(rc)
-        return EFIVARS_LOG_TRACE(rc, "can't create dir %s\n", dir);
+        MBABORT("can't create dir %s\n", dir);
 
     return rc;
 }
@@ -279,14 +279,14 @@ int util_mount(const char *source, const char *target,
     if(!filesystemtype) {
         filesystemtype = util_fstype = util_get_fstype(source);
         if(!filesystemtype) {
-            return EFIVARS_LOG_TRACE(-EINVAL, "can't get filesystem for %s\n", source);
+            MBABORT("can't get filesystem for %s\n", source);
         }
     }
 
     // mount
     rc = mount(source, target, filesystemtype, mountflags, data);
     if(rc) {
-        return EFIVARS_LOG_TRACE(rc, "mount(%s, %s, %s, %lu, %p) failed\n", source, target, filesystemtype, mountflags, data);
+        MBABORT("mount(%s, %s, %s, %lu, %p) failed\n", source, target, filesystemtype, mountflags, data);
     }
 
     // cleanup
@@ -363,7 +363,7 @@ int util_mkfs(const char *device, const char* fstype) {
     if(!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
         return util_mke2fs(device, fstype);
 
-    return EFIVARS_LOG_TRACE(-ENOENT, "filesystem %s is not supported\n", fstype);
+    MBABORT_RET("filesystem %s is not supported\n", fstype);
 }
 
 int util_block_num(const char *path, unsigned long* numblocks)
@@ -455,12 +455,12 @@ char *util_get_fstype(const char *filename)
     // probe device
     pr = blkid_new_probe_from_filename(filename);
     if(!pr) {
-        EFIVARS_LOG_TRACE(-EINVAL, "can't create probe for %s\n", filename);
+        MBABORT("can't create probe for %s\n", filename);
         return NULL;
     }
 
     if (blkid_do_fullprobe(pr)) {
-        EFIVARS_LOG_TRACE(-EINVAL, "can't probe %s\n", filename);
+        MBABORT("can't probe %s\n", filename);
         return NULL;
     }
 
@@ -500,14 +500,14 @@ char* util_get_espdir(const char* mountpoint) {
         is_datamedia = 1;
     }
     else {
-        EFIVARS_LOG_TRACE(-EINVAL, "Invalid ESP path %s\n", multiboot_data->esp->esp);
+        MBABORT("Invalid ESP path %s\n", multiboot_data->esp->esp);
         return NULL;
     }
 
     // build UEFIESP mountpoint
     rc = snprintf(buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
     if(rc<0 || rc>=PATH_MAX) {
-        EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
+        MBABORT("Can't build name for UEFIESP: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -515,7 +515,7 @@ char* util_get_espdir(const char* mountpoint) {
         // build UEFIESP mountpoint
         rc = snprintf(buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
         if(rc<0 || rc>=PATH_MAX) {
-            EFIVARS_LOG_TRACE(rc, "Can't build name for UEFIESP: %s\n", strerror(errno));
+            MBABORT("Can't build name for UEFIESP: %s\n", strerror(errno));
             return NULL;
         }
 
@@ -529,7 +529,7 @@ char* util_get_espdir(const char* mountpoint) {
     }
 
     if(!ret) {
-        EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for UEFIESP: %s\n", strerror(errno));
+        MBABORT("Can't alloc mem for UEFIESP: %s\n", strerror(errno));
         return NULL;
     }
     return ret;
@@ -543,7 +543,7 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     // get espdir
     char* espdir = util_get_espdir(mountpoint);
     if(!espdir) {
-        EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        MBABORT("Can't get ESP directory: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -551,28 +551,28 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     rc = snprintf(buf, sizeof(buf), "%s", espdir);
     free(espdir);
     if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        EFIVARS_LOG_TRACE(rc, "Can't copy ESP dir path: %s\n", espdir);
+        MBABORT("Can't copy ESP dir path: %s\n", espdir);
         return NULL;
     }
 
     // build partition name
     char* name = util_basename(rec->mount_point);
     if(!name) {
-        EFIVARS_LOG_TRACE(-1, "Can't get basename of %s\n", rec->mount_point);
+        MBABORT("Can't get basename of %s\n", rec->mount_point);
         return NULL;
     }
 
     // create path for loop image
     rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", buf, name);
     if(rc<0 || rc>=PATH_MAX) {
-        EFIVARS_LOG_TRACE(rc, "Can't build name for partition image\n");
+        MBABORT("Can't build name for partition image\n");
         return NULL;
     }
 
     // duplicate buffer
     char* ret = strdup(buf2);
     if(!ret) {
-        EFIVARS_LOG_TRACE(-errno, "Can't alloc mem for partition name: %s\n", strerror(errno));
+        MBABORT("Can't alloc mem for partition name: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -591,7 +591,7 @@ int util_create_partition_backup_ex(const char* device, const char* file, unsign
     if(force || !util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
         rc = util_dd(device, file, num_blocks);
         if(rc) {
-            return EFIVARS_LOG_TRACE(rc, "Can't copy %s to %s\n", device, file);
+            MBABORT("Can't copy %s to %s\n", device, file);
         }
     }
 

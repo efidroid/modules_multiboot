@@ -243,7 +243,7 @@ int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* mi
 
     rc = scan_mounted_volumes();
     if(rc) {
-        EFIVARS_LOG_TRACE(errno, "Can't scan mounted volumes\n");
+        MBABORT("Can't scan mounted volumes\n");
         return rc;
     }
 
@@ -264,7 +264,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     // scan mounted volumes
     rc = scan_mounted_volumes();
     if(rc) {
-        EFIVARS_LOG_FATAL(rc, "Can't scan mounted volumes: %s\n", strerror(errno));
+        MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
         return -1;
     }
 
@@ -295,7 +295,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
             data = NULL;
             rc = uevent_mount(syshook_multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
             if(rc) {
-                EFIVARS_LOG_FATAL(rc, "Can't mount ESP: %s\n", strerror(errno));
+                MBABORT("Can't mount ESP: %s\n", strerror(errno));
                 return -1;
             }
         }
@@ -306,21 +306,21 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     // get espdir
     char* espdir = util_get_espdir(mountpoint);
     if(!espdir) {
-        EFIVARS_LOG_FATAL(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        MBABORT("Can't get ESP directory: %s\n", strerror(errno));
         return -1;
     }
 
     // get ESP filename
     char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
     if(!espfilename) {
-        EFIVARS_LOG_FATAL(-1, "Can't get filename\n");
+        MBABORT("Can't get filename\n");
         return -1;
     }
 
     // copy loop to esp
     rc = util_dd(replacement->loopdevice, espfilename, 0);
     if(rc) {
-        EFIVARS_LOG_FATAL(rc, "Can't create partition image\n");
+        MBABORT("Can't create partition image\n");
         return -1;
     }
 
@@ -328,7 +328,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         // unmount ESP
         rc = umount(MBPATH_ESP);
         if(rc) {
-            EFIVARS_LOG_FATAL(rc, "Can't unmount ESP: %s\n", strerror(errno));
+            MBABORT("Can't unmount ESP: %s\n", strerror(errno));
             return -1;
         }
     }
@@ -358,7 +358,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
             // create id file
             int fd = open(MBPATH_STUB_IDFILE, O_RDWR|O_CREAT);
             if(fd<0) {
-                EFIVARS_LOG_FATAL(rc, "Can't create ID file\n");
+                MBABORT("Can't create ID file\n");
                 return -1;
             }
             close(fd);
@@ -366,14 +366,14 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
             // build format command
             rc = snprintf(buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->u.multiboot.partpath);
             if(rc<0 || (size_t)rc >= sizeof(buf)) {
-                EFIVARS_LOG_FATAL(-1, "Can't build format command\n");
+                MBABORT("Can't build format command\n");
                 return -1;
             }
 
             // format bind source
             rc = util_shell(buf);
             if(rc) {
-                EFIVARS_LOG_FATAL(rc, "Can't format bind source at %s\n", replacement->u.multiboot.partpath);
+                MBABORT("Can't format bind source at %s\n", replacement->u.multiboot.partpath);
                 return -1;
             }
         }
@@ -381,7 +381,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
         // unmount loop device
         rc = umount(MBPATH_STUB);
         if(rc) {
-            EFIVARS_LOG_FATAL(rc, "Can't unmount %s: %s\n", MBPATH_STUB, strerror(errno));
+            MBABORT("Can't unmount %s: %s\n", MBPATH_STUB, strerror(errno));
             return -1;
         }
     }

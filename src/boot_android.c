@@ -67,7 +67,7 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     // get espdir
     esp_mountpoint = util_get_espdir(volume->mount_point);
     if(!esp_mountpoint) {
-        rc = EFIVARS_LOG_TRACE(-1, "Can't get ESP directory: %s\n", strerror(errno));
+        LOGE("Can't get ESP directory: %s\n", strerror(errno));
         goto finish;
     }
 
@@ -178,21 +178,6 @@ finish:
     free(name);
     free(esp_mountpoint);
 
-    if(rc) {
-        LOGE("Error in %s: %s\n", __func__, strerror(-rc));
-        const char* errorbuf = efivars_get_errorbuf();
-        if(errorbuf && errorbuf[0]!=0) {
-            LOGE(
-                "LOG TRACE:\n"
-                "===================================\n"
-                "%s"
-                "===================================\n"
-                "\n",
-                errorbuf
-            );
-        }
-    }
-
     // continue trigger-postfs
     kill(info->si_pid, SIGUSR1);
 }
@@ -207,7 +192,7 @@ static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void
         len = strlen(str); \
         bytes_written = write(fd, str, len); \
         if(bytes_written!=(size_t)len) { \
-            return EFIVARS_LOG_TRACE(-errno, "Can't write\n"); \
+            MBABORT("Can't write\n"); \
         }
 
 int boot_android(void) {
@@ -224,7 +209,7 @@ int boot_android(void) {
 
         pid_t pid = fork();
         if(pid<0) {
-            return EFIVARS_LOG_TRACE(pid, "Can't fork current process\n");
+            MBABORT("Can't fork current process\n");
         }
 
         // parent
@@ -277,13 +262,13 @@ int boot_android(void) {
         // get directory of multiboot.ini
         char* basedir = util_dirname(multiboot_data->path);
         if(!basedir) {
-            return EFIVARS_LOG_TRACE(-1, "Can't get base dir for multiboot path\n");
+            MBABORT("Can't get base dir for multiboot path\n");
         }
 
         // open fstab for writing
         int fd = open(multiboot_data->romfstabpath, O_WRONLY|O_TRUNC);
         if(fd<0) {
-            return EFIVARS_LOG_TRACE(-errno, "Can't open init.rc for writing\n");
+            MBABORT("Can't open init.rc for writing\n");
         }
 
         // write entries
@@ -301,7 +286,7 @@ int boot_android(void) {
                 // build path
                 rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
                 if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    return EFIVARS_LOG_TRACE(-1, "Can't build path for partition '%s'\n", part->name);
+                    MBABORT("Can't build path for partition '%s'\n", part->name);
                 }
 
                 if(part->type==MBPART_TYPE_BIND) {
@@ -312,19 +297,19 @@ int boot_android(void) {
                     // build loop path
                     rc = snprintf(buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
                     if(rc<0 || (size_t)rc>=sizeof(buf2)) {
-                        return EFIVARS_LOG_TRACE(rc, "Can't build path for loop device\n");
+                        MBABORT("Can't build path for loop device\n");
                     }
 
                     // create new node
                     rc = util_make_loop(buf2);
                     if(rc) {
-                        return EFIVARS_LOG_TRACE(rc, "Can't create loop device at %s\n", buf2);
+                        MBABORT("Can't create loop device at %s\n", buf2);
                     }
 
                     // setup loop device
                     rc = util_losetup(buf2, buf, false);
                     if(rc) {
-                        return EFIVARS_LOG_TRACE(rc, "Can't setup loop device at %s for %s\n", buf2, buf);
+                        MBABORT("Can't setup loop device at %s for %s\n", buf2, buf);
                     }
 
                     blk_device = buf2;
@@ -335,13 +320,13 @@ int boot_android(void) {
             size_t linelen = strlen(blk_device) + strlen(rec->mount_point) + strlen(rec->fs_type) + strlen(mnt_flags) + strlen(rec->fs_mgr_flags_orig) + 6;
             char* line = malloc(linelen);
             if(!line) {
-                return EFIVARS_LOG_TRACE(-errno, "Can't allocate memory\n");
+                MBABORT("Can't allocate memory\n");
             }
 
             // build line
             rc = snprintf(line, linelen, "%s %s %s %s %s\n", blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
             if(rc<0 || (size_t)rc>=linelen) {
-                return EFIVARS_LOG_TRACE(-errno, "Can't build fstab line\n");
+                MBABORT("Can't build fstab line\n");
             }
 
             // write line

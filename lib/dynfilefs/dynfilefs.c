@@ -243,7 +243,7 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
        fp = fopen(save_path, "w+");
        if (fp == NULL)
        {
-          return EFIVARS_LOG_TRACE(14, "cannot open %s for writing\n", save_path);
+          MBABORT("cannot open %s for writing\n", save_path);
        }
 
        // build header
@@ -254,7 +254,7 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
        ret = fwrite(&header,sizeof(header),1,fp);
        if (ret < 0)
        {
-          return EFIVARS_LOG_TRACE(15, "cannot write to %s\n", save_path);
+          MBABORT("cannot write to %s\n", save_path);
        }
        fseeko(fp, sizeof(header) + NUM_INDEXED_BLOCKS*sizeof(zero)*2, SEEK_SET);
        ret = fwrite(&zero,sizeof(zero),1,fp);
@@ -262,7 +262,7 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
 
     if (fp == NULL)
     {
-       return EFIVARS_LOG_TRACE(16, "cannot open %s for writing\n", save_path);
+       MBABORT("cannot open %s for writing\n", save_path);
     }
 
     fseeko(fp, 0, SEEK_SET);
@@ -270,12 +270,12 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
     // read header
     ret = fread(&header, sizeof(header), 1, fp);
     if(ret < 0) {
-       return EFIVARS_LOG_TRACE(-1, "cannot read header of %s\n", save_path);
+       MBABORT("cannot read header of %s\n", save_path);
     }
 
     // check magic
     if(memcmp(header.magic, cmpmagic, sizeof(cmpmagic))) {
-       return EFIVARS_LOG_TRACE(-1, "invalid magic in %s\n", save_path);
+       MBABORT("invalid magic in %s\n", save_path);
     }
 
     // first index is always right after the header. Get the position

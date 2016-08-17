@@ -22,17 +22,17 @@ multiboot_data_t* syshook_multiboot_data = NULL;
 
 static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
     if(!process){
-        EFIVARS_LOG_FATAL(-1, "process is NULL\n");
+        MBABORT("process is NULL\n");
         return -1;
     }
     if(process->pdata){
-        EFIVARS_LOG_FATAL(-1, "pdata does already exist\n");
+        MBABORT("pdata does already exist\n");
         return -1;
     }
 
     syshook_pdata_t* pdata = calloc(1, sizeof(syshook_pdata_t));
     if(!pdata) {
-        EFIVARS_LOG_FATAL(-1, "no pdata\n");
+        MBABORT("no pdata\n");
         return -1;
     }
 
@@ -40,11 +40,11 @@ static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
     if(pprocess) {
         syshook_pdata_t* ppdata = pprocess->pdata;
         if(!ppdata) {
-            EFIVARS_LOG_FATAL(-1, "no pdata\n");
+            MBABORT("no pdata\n");
             return -1;
         }
         if(!ppdata->fdtable) {
-            EFIVARS_LOG_FATAL(-1, "no fdtable\n");
+            MBABORT("no fdtable\n");
             return -1;
         }
 
@@ -77,7 +77,7 @@ static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
 static int multiboot_trace_destroy_process(UNUSED syshook_process_t* process) {
     syshook_pdata_t* pdata = process->pdata;
     if(!pdata) {
-        EFIVARS_LOG_FATAL(-1, "no pdata\n");
+        MBABORT("no pdata\n");
         return -1;
     }
 
