@@ -15,6 +15,7 @@
 #include <sys/mount.h>
 #include <lib/mounts.h>
 #include <common.h>
+#include <util.h>
 
 #include "syscalls_private.h"
 

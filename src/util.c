@@ -648,10 +648,6 @@ multiboot_partition_t* util_mbpart_by_name(const char* name) {
     return NULL;
 }
 
-pid_t gettid(void) {
-    return (pid_t)syscall(SYS_gettid);
-}
-
 void util_mount_esp(void) {
     int rc;
     unsigned long mountflags = 0;

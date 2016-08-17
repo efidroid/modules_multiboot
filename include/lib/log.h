@@ -26,9 +26,9 @@
 #endif
 
 #include <sys/cdefs.h>
+#include <sys/syscall.h>
 #include <stdarg.h>
 #include <unistd.h>
-#include <util.h>
 #include <lib/efivars.h>
 
 __BEGIN_DECLS
@@ -51,7 +51,7 @@ __END_DECLS
 #define LOGF_LEVEL 8
 
 #define LOG_INTERNAL(level, levelprefix, fmt, ...) \
-    log_write(level, levelprefix "/" LOG_TAG "(%d:%d): " fmt, getpid(), gettid(), ##__VA_ARGS__)
+    log_write(level, levelprefix "/" LOG_TAG "(%d:%d): " fmt, getpid(), (pid_t)syscall(SYS_gettid), ##__VA_ARGS__)
 
 #define LOGV(fmt, ...) LOG_INTERNAL(LOGV_LEVEL, "V", fmt, ##__VA_ARGS__)
 #define LOGD(fmt, ...) LOG_INTERNAL(LOGD_LEVEL, "D", fmt, ##__VA_ARGS__)

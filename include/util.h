@@ -68,7 +68,6 @@ char* util_getmbpath_from_device(const char* device);
 int util_fs_supports_multiboot_bind(const char* type);
 char* util_device_from_mbname(const char* name);
 multiboot_partition_t* util_mbpart_by_name(const char* name);
-pid_t gettid(void);
 void util_mount_esp(void);
 
 #endif
