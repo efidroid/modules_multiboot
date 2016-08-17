@@ -66,13 +66,13 @@ static void import_kernel_nv(char *name)
         else if(!strncmp(value, "MBR", 3))
             format = "%3s,%11s,%ms";
         else {
-            MBABORT("invalid format\n");
+            MBABORT("invalid multibootpath: %s\n", value);
             return;
         }
 
         // read values
         if ((rc=sscanf(value, format, type, guid, &path)) != 3) {
-            MBABORT("invalid format\n");
+            MBABORT("invalid multibootpath: %s\n", value);
             return;
         }
 
@@ -83,7 +83,7 @@ static void import_kernel_nv(char *name)
     if (!strcmp(name, "multiboot.debug")) {
         uint32_t val;
         if (sscanf(value, "%u", &val) != 1) {
-            LOGE("invalid value for %s\n", name);
+            LOGE("invalid value for %s: %s\n", name, value);
             return;
         }
 
@@ -105,9 +105,12 @@ static int device_matches(const char* path, const char* guid) {
     // libblkid uses hardcoded paths for /sys and /dev
     // to make it work with our custom environmont (without modifying the libblkid code)
     // we have to chroot to /multiboot
-    pid = fork();
+    pid = safe_fork();
     if (!pid) {
-        chroot("/multiboot");
+        rc = chroot("/multiboot");
+        if(rc<0) {
+            MBABORT("chroot error: %s\n", strerror(errno));
+        }
 
         // get dev
         blkid_get_cache(&cache, NULL);
@@ -157,8 +160,8 @@ int run_init(int trace)
 
     // error check
     if (ret) {
-        LOGE("Can't start %s: %s\n", par[0], strerror(errno));
-        return ret;
+        MBABORT("Can't start %s: %s\n", par[0], strerror(errno));
+        return -1;
     }
 
     return 0;
@@ -280,7 +283,7 @@ static int mbini_handler(UNUSED void* user, const char* section, const char* nam
 
     // validate args
     if(!name || !value) {
-        MBABORT("Invalid argument\n");
+        MBABORT("Invalid name/value in multiboot.ini\n");
         return 1;
     }
 
@@ -332,25 +335,13 @@ int multiboot_main(UNUSED int argc, char** argv) {
     log_init();
 
     // mount tmpfs to MBPATH_ROOT so we'll be able to write once init mounted rootfs as RO
-    rc = util_mount("tmpfs", MBPATH_ROOT, "tmpfs", MS_NOSUID, "mode=0755");
-    if(rc) {
-        LOGE("Can't mount tmpfs: %s\n", strerror(errno));
-        return rc;
-    }
+    SAFE_MOUNT("tmpfs", MBPATH_ROOT, "tmpfs", MS_NOSUID, "mode=0755");
 
     // mount private sysfs
-    rc = util_mount("sysfs", MBPATH_SYS, "sysfs", 0, NULL);
-    if(rc) {
-        LOGE("Can't mount sysfs: %s\n", strerror(errno));
-        return rc;
-    }
+    SAFE_MOUNT("sysfs", MBPATH_SYS, "sysfs", 0, NULL);
 
     // mount private proc
-    rc = util_mount("proc", MBPATH_PROC, "proc", 0, NULL);
-    if(rc) {
-        LOGE("Can't mount sysfs: %s\n", strerror(errno));
-        return rc;
-    }
+    SAFE_MOUNT("proc", MBPATH_PROC, "proc", 0, NULL);
 
     // parse cmdline
     LOGD("parse cmdline\n");
@@ -366,10 +357,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
 
     // mount private dev fs
     LOGD("mount %s\n", MBPATH_DEV);
-    rc = util_mount("tmpfs", MBPATH_DEV, "tmpfs", MS_NOSUID, "mode=0755");
-    if(rc) {
-        MBABORT("Can't mount tmpfs for dev: %s\n", strerror(errno));
-    }
+    SAFE_MOUNT("tmpfs", MBPATH_DEV, "tmpfs", MS_NOSUID, "mode=0755");
 
     // build private dev fs
     LOGD("build dev fs\n");
@@ -399,39 +387,18 @@ int multiboot_main(UNUSED int argc, char** argv) {
     }
 
     // create symlinks
-    if(util_exists(MBPATH_TRIGGER_POSTFS_DATA, false)) {
-        LOGV("delete %s\n", MBPATH_TRIGGER_POSTFS_DATA);
-        rc = unlink(MBPATH_TRIGGER_POSTFS_DATA);
-        if(rc) {
-            MBABORT("Error deleting "MBPATH_TRIGGER_POSTFS_DATA": %s\n", strerror(errno));
-        }
-    }
     LOGV("create symlink %s->%s\n", MBPATH_TRIGGER_POSTFS_DATA, argv[0]);
     rc = symlink(argv[0], MBPATH_TRIGGER_POSTFS_DATA);
     if(rc) {
         MBABORT("Can't create symlink "MBPATH_TRIGGER_POSTFS_DATA": %s\n", strerror(errno));
     }
 
-    if(util_exists(MBPATH_BUSYBOX, false)) {
-        LOGV("delete %s\n", MBPATH_BUSYBOX);
-        rc = unlink(MBPATH_BUSYBOX);
-        if(rc) {
-            MBABORT("Error deleting "MBPATH_BUSYBOX": %s\n", strerror(errno));
-        }
-    }
     LOGV("create symlink %s->%s\n", MBPATH_BUSYBOX, argv[0]);
     rc = symlink(argv[0], MBPATH_BUSYBOX);
     if(rc) {
         MBABORT("Can't create symlink "MBPATH_BUSYBOX": %s\n", strerror(errno));
     }
 
-    if(util_exists(MBPATH_MKE2FS, false)) {
-        LOGV("delete %s\n", MBPATH_MKE2FS);
-        rc = unlink(MBPATH_MKE2FS);
-        if(rc) {
-            MBABORT("Error deleting "MBPATH_MKE2FS": %s\n", strerror(errno));
-        }
-    }
     LOGV("create symlink %s->%s\n", MBPATH_MKE2FS, argv[0]);
     rc = symlink(argv[0], MBPATH_MKE2FS);
     if(rc) {
