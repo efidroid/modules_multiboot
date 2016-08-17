@@ -42,7 +42,7 @@ static char *copy_trim(const char *s)
     int start, end;
     for (start = 0; s[start] && isspace(s[start]); ++start);
     if (s[start] == '\0')
-        return strdup("");
+        return safe_strdup("");
     for (end = strlen(s); end > 0 && isspace(s[end - 1]); --end);
     return strndup(s + start, end - start);
 }
@@ -67,7 +67,7 @@ static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
     // open file
     fp = fopen(filename, "r");
     if (fp == NULL) {
-        LOGE("Can't open file %s\n", filename);
+        LOGE("Can't open file %s: %s\n", filename, strerror(errno));
         return -errno;
     }
 
@@ -91,9 +91,9 @@ static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
         } else if (!strcmp(name, "PARTN")) {
             info->entries[index].partn = getint(value);
         } else if (!strcmp(name, "DEVNAME")) {
-            info->entries[index].devname = strdup(value);
+            info->entries[index].devname = safe_strdup(value);
         } else if (!strcmp(name, "PARTNAME")) {
-            info->entries[index].partname = strdup(value);
+            info->entries[index].partname = safe_strdup(value);
         } else if (!strcmp(name, "DEVTYPE")) {
             if (!strcmp(value, "disk"))
                 info->entries[index].type = UEVENT_BLOCK_TYPE_DISK;
@@ -117,7 +117,7 @@ uevent_block_info_t *get_block_devices(void)
 {
     const char *path = UEVENT_PATH_BLOCK_DEVICES;
     char buf[PATH_MAX];
-    uevent_block_info_t *info = malloc(sizeof(uevent_block_info_t));
+    uevent_block_info_t *info = safe_malloc(sizeof(uevent_block_info_t));
     memset(info, 0, sizeof(info[0]));
 
     DIR *d = opendir(path);
@@ -132,7 +132,7 @@ uevent_block_info_t *get_block_devices(void)
         if (dt->d_type != DT_LNK)
             continue;
 
-        snprintf(buf, ARRAY_SIZE(buf), "%s/%s/uevent", path, dt->d_name);
+        SAFE_SNPRINTF_RET(LOGE, NULL, buf, ARRAY_SIZE(buf), "%s/%s/uevent", path, dt->d_name);
         add_uevent_entry(info, buf);
     }
 
@@ -206,15 +206,11 @@ uevent_block_t *get_blockinfo_for_path(uevent_block_info_t *info, const char *pa
 
 char *uevent_realpath(uevent_block_info_t *info, const char *path, char *resolved_path)
 {
-    int rc;
-
     uevent_block_t *bi = get_blockinfo_for_path(info, path);
     if (!bi)
         return NULL;
 
-    rc = snprintf(resolved_path, PATH_MAX, "/dev/block/%s", bi->devname);
-    if(rc<0 || rc>=PATH_MAX)
-        return NULL;
+    SAFE_SNPRINTF_RET(LOGE, NULL, resolved_path, PATH_MAX, "/dev/block/%s", bi->devname);
 
     return resolved_path;
 }
@@ -227,10 +223,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
     int rc;
 
     // build block device path
-    rc = snprintf(path_block, sizeof(path_block), "%s/block", path);
-    if(rc<0 || (size_t)rc>=sizeof(path_block)) {
-        return rc;
-    }
+    SAFE_SNPRINTF_RET(LOGE, -1, path_block, sizeof(path_block), "%s/block", path);
 
     // create block directory
     rc = util_mkdir(path_block);
@@ -243,10 +236,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
         uevent_block_t *bi = &info->entries[i];
 
         // build node path
-        rc = snprintf(buf, sizeof(buf), "%s/%s", path_block, bi->devname);
-        if(rc<0 || (size_t)rc>=sizeof(buf)) {
-            return rc;
-        }
+        SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/%s", path_block, bi->devname);
 
         // create node
         rc = mknod(buf, S_IFBLK | 0600, makedev(bi->major, bi->minor));
@@ -256,10 +246,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
     }
 
     // build devzero path
-    rc = snprintf(buf, sizeof(buf), "%s/zero", path);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        return rc;
-    }
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/zero", path);
 
     // create devzero node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 5));
@@ -268,10 +255,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
     }
 
     // build devnull path
-    rc = snprintf(buf, sizeof(buf), "%s/null", path);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        return rc;
-    }
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/null", path);
 
     // create devnull node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 3));
@@ -286,14 +270,10 @@ int uevent_mount(uevent_block_t *bi, const char *target,
                  const char *filesystemtype, unsigned long mountflags,
                  const void *data)
 {
-    int rc;
     char buf[PATH_MAX];
 
     // build dev name
-    rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        return rc;
-    }
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
 
     // mount
     return util_mount(buf, target, filesystemtype, mountflags, data);
