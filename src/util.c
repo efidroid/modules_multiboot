@@ -173,7 +173,7 @@ int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
     pid_t pid;
     int status = 0;
 
-    pid = fork();
+    pid = safe_fork();
     if (!pid) {
         // redirect stdout and stderr to kmsg
         int fd = klog_get_fd();

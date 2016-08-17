@@ -207,10 +207,7 @@ int boot_android(void) {
     if(!multiboot_data->is_multiboot) {
         LOGI("Booting main system\n");
 
-        pid_t pid = fork();
-        if(pid<0) {
-            MBABORT("Can't fork current process\n");
-        }
+        pid_t pid = safe_fork();
 
         // parent
         if(pid) {

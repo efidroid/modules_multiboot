@@ -28,5 +28,6 @@
 }while(0)
 
 char *safe_strdup(const char *s);
+pid_t safe_fork(void);
 
 #endif
