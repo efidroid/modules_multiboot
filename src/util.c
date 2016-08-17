@@ -482,7 +482,6 @@ out:
 char* util_get_espdir(const char* mountpoint) {
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
-    char* ret = NULL;
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
     if(!multiboot_data->esp) {
@@ -503,27 +502,21 @@ char* util_get_espdir(const char* mountpoint) {
         return NULL;
     }
 
-    // build UEFIESP mountpoint
     SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
 
+    // check if UEFIESP exists in root dir
     if(!util_exists(buf, true) && is_datamedia) {
-        // build UEFIESP mountpoint
-        SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
+        SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0", mountpoint, espdir);
 
-        if(util_exists(buf2, true))
-            ret = safe_strdup(buf2);
-        else
-            ret = safe_strdup(buf);
-    }
-    else {
-        ret = safe_strdup(buf);
+        // check if /0 exists
+        if(util_exists(buf2, true)) {
+            SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
+            return safe_strdup(buf2);
+        }
     }
 
-    if(!ret) {
-        LOGE("Can't alloc mem for UEFIESP: %s\n", strerror(errno));
-        return NULL;
-    }
-    return ret;
+    // the caller may create the directory, so always return the root dir as a fallback
+    return safe_strdup(buf);
 }
 
 char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec) {
