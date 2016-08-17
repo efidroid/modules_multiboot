@@ -534,7 +534,10 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     // copy path
     rc = snprintf(buf, sizeof(buf), "%s", espdir);
     free(espdir);
-    if(SNPRINTF_ERROR(rc, sizeof(buf))) return NULL;
+    if(SNPRINTF_ERROR(rc, sizeof(buf))) {
+        LOGE("snprintf error\n");
+        return NULL;
+    }
 
     // build partition name
     char* name = util_basename(rec->mount_point);
@@ -544,8 +547,12 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     }
 
     // create path for loop image
-    SAFE_SNPRINTF_RET(LOGE, NULL, buf2, PATH_MAX, "%s/partition_%s.img", buf, name);
+    rc = snprintf(buf2, sizeof(buf2), "%s/partition_%s.img", buf, name);
     free(name);
+    if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
+        LOGE("snprintf error\n");
+        return NULL;
+    }
 
     // duplicate buffer
     return safe_strdup(buf2);
