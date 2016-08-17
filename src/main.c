@@ -21,8 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <lib/efivars.h>
-
 #include <util.h>
 #include <common.h>
 

@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <util.h>
+#include <lib/efivars.h>
 
 __BEGIN_DECLS
 
@@ -47,22 +48,27 @@ __END_DECLS
 #define LOGW_LEVEL 5
 #define LOGE_LEVEL 6
 #define LOGA_LEVEL 7
+#define LOGF_LEVEL 8
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
+#define LOG_INTERNAL(level, levelprefix, fmt, ...) \
+    log_write(level, levelprefix "/" LOG_TAG "(%d:%d): " fmt, getpid(), gettid(), ##__VA_ARGS__)
 
-#if LOG_SHOW_CODELINE
-#define LOG_TAG_STR(tag) tag " (" __FILE__ ":" STR(__LINE__) ")"
-#else
-#define LOG_TAG_STR(tag) tag
-#endif
+#define LOGV(fmt, ...) LOG_INTERNAL(LOGV_LEVEL, "V", fmt, ##__VA_ARGS__)
+#define LOGD(fmt, ...) LOG_INTERNAL(LOGD_LEVEL, "D", fmt, ##__VA_ARGS__)
+#define LOGI(fmt, ...) LOG_INTERNAL(LOGI_LEVEL, "I", fmt, ##__VA_ARGS__)
+#define LOGW(fmt, ...) LOG_INTERNAL(LOGW_LEVEL, "W", fmt, ##__VA_ARGS__)
+#define LOGE(fmt, ...) LOG_INTERNAL(LOGE_LEVEL, "E", fmt, ##__VA_ARGS__)
+#define LOGA(fmt, ...) LOG_INTERNAL(LOGA_LEVEL, "A", fmt, ##__VA_ARGS__)
+#define LOGF(fmt, ...) do {\
+    efivars_set_error(fmt, ##__VA_ARGS__); \
+    LOG_INTERNAL(LOGF_LEVEL, "F", fmt, ##__VA_ARGS__); \
+} while(0)
 
-#define LOGV(fmt, ...) log_write(LOGV_LEVEL, "V/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
-#define LOGD(fmt, ...) log_write(LOGD_LEVEL, "D/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
-#define LOGI(fmt, ...) log_write(LOGI_LEVEL, "I/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
-#define LOGW(fmt, ...) log_write(LOGW_LEVEL, "W/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
-#define LOGE(fmt, ...) log_write(LOGE_LEVEL, "E/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
-#define LOGA(fmt, ...) log_write(LOGA_LEVEL, "A/" "[%d:%d] " LOG_TAG_STR(LOG_TAG) ": " fmt, getpid(), gettid(), ##__VA_ARGS__)
+#define MBABORT LOGF
+#define MBABORT_RET(fmt, ...) do {\
+    MBABORT(fmt, ##__VA_ARGS__); \
+    return -1; \
+} while(0)
 
 #define LOG_DEFAULT_LEVEL  LOGD_LEVEL  /* messages >= this level are logged */
 

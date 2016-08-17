@@ -14,7 +14,6 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
-#include <lib/efivars.h>
 #include <lib/mounts.h>
 #include <common.h>
 

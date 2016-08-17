@@ -36,11 +36,6 @@
 #define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS 0x00000010
 #define EFI_VARIABLE_DEFAULT_ATTRIBUTES (EFI_VARIABLE_NON_VOLATILE|EFI_VARIABLE_BOOTSERVICE_ACCESS|EFI_VARIABLE_RUNTIME_ACCESS)
 
-#define EFIVARS_LOG_INTERNAL(fatal, log, x, fmt, ...) efivars_append_error((fatal), (log), (x), LOG_TAG, "%s:%u: error %d in %s: " fmt , SIMPLEFILENAME, __LINE__, (x), __func__, ##__VA_ARGS__ );
-#define EFIVARS_LOG_TRACE(x, fmt, ...) EFIVARS_LOG_INTERNAL(0, 0, (x), fmt, ##__VA_ARGS__ );
-#define EFIVARS_LOG_ERROR(x, fmt, ...) EFIVARS_LOG_INTERNAL(0, 1, (x), fmt, ##__VA_ARGS__ );
-#define EFIVARS_LOG_FATAL(x, fmt, ...) EFIVARS_LOG_INTERNAL(1, 1, (x), fmt, ##__VA_ARGS__ );
-
 typedef struct {
     uint32_t Data1;
     uint16_t Data2;
@@ -60,9 +55,5 @@ int efivar_set_global(const char* name, uint32_t datasize, const void* data);
 int efivar_get_efidroid(const char* name, uint32_t* datasize, void* data);
 int efivar_set_efidroid(const char* name, uint32_t datasize, const void* data);
 
-int efivars_report_error(const char* error);
-int efivars_append_error(int fatal, int log, int error, const char* tag, const char* fmt, ...) __attribute__ ((format(printf, 5, 6)));
-
-int efivars_report_errorbuf(void);
-const char* efivars_get_errorbuf(void);
+int efivars_set_error(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
 #endif

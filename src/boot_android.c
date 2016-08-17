@@ -23,7 +23,6 @@
 #include <sys/stat.h>
 #include <stdio.h>
 
-#include <lib/efivars.h>
 #include <lib/mounts.h>
 
 #include <util.h>

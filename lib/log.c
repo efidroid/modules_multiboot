@@ -15,9 +15,11 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <lib/log.h>
 #include <lib/klog.h>
+#include <lib/android_reboot.h>
 
 static int log_level = LOG_DEFAULT_LEVEL;
 
@@ -52,4 +54,15 @@ void log_write(int level, const char *fmt, ...)
     va_start(ap, fmt);
     log_vwrite(level, fmt, ap);
     va_end(ap);
+
+    if(level>=LOGF_LEVEL) {
+        // try to reboot
+        android_reboot(ANDROID_RB_RESTART, 0, 0);
+
+        // exit if that fails(we're init)
+        exit(1);
+
+        // never return
+        for(;;);
+    }
 }

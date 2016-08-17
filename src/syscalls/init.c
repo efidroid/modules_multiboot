@@ -11,7 +11,6 @@
 
 #include <syshook.h>
 #include <sys/syscall.h>
-#include <lib/efivars.h>
 #include <common.h>
 
 #include "syscalls_private.h"

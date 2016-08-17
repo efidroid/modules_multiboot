@@ -13,7 +13,6 @@
 #include <syshook.h>
 #include <sys/syscall.h>
 #include <sys/mount.h>
-#include <lib/efivars.h>
 #include <lib/mounts.h>
 #include <common.h>
 

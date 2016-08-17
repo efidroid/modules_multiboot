@@ -29,7 +29,6 @@
 
 #include <lib/cksum.h>
 #include <lib/efivars.h>
-#include <lib/android_reboot.h>
 #include <common.h>
 #include <util.h>
 
@@ -77,10 +76,6 @@ typedef struct {
 typedef unsigned long addr_t;
 typedef int (*efivar_callback_t)(void* pdata, const uint16_t* name, const uint32_t namesize, const void* data,
                                  const uint32_t datasize, efi_guid_t guid, uint32_t attributes);
-
-static char* errorbuf = NULL;
-static size_t errorbuf_len = 0;
-
 
 static int copy_ansi2unicodestr(uint16_t** outdst, const char* src, size_t* outsz) {
     uint16_t* dst = NULL;
@@ -477,14 +472,7 @@ int efivars_report_error(const char* error) {
     return efivar_set_efidroid("EFIDroidErrorStr", strlen(error)+1, error);
 }
 
-int efivars_report_errorbuf(void) {
-    if(errorbuf)
-        return efivars_report_error(errorbuf);
-    else
-        return efivars_report_error("Unknown error");
-}
-
-int efivars_append_error(int fatal, int log, int error, const char* tag, const char* fmt, ...) {
+int efivars_set_error(const char *fmt, ...) {
     int n;
     int size = 100;
     char *p, *np;
@@ -492,7 +480,7 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
 
     // alloc initial memory
     if ((p = malloc(size)) == NULL)
-        return error;
+        return -1;
 
     while (1) {
         // Try to print in the allocated space
@@ -502,7 +490,7 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
 
         // Check error code
         if (n < 0)
-            return error;
+            return -1;
 
         // If that worked, we're done
         if (n < size)
@@ -512,49 +500,17 @@ int efivars_append_error(int fatal, int log, int error, const char* tag, const c
         size = n + 1;
         if ((np = realloc (p, size)) == NULL) {
             free(p);
-            return error;
+            return -1;
         } else {
             p = np;
         }
     }
 
-    if(log) {
-        log_write(LOGE_LEVEL, "E/" "%s: %s", tag, p);
-    }
+    // write error to efi variable
+    efivars_report_error(p);
 
-    // expand buffer size
-    int newlen = errorbuf_len+strlen(p)+1;
-    errorbuf = realloc(errorbuf, newlen);
-    if(!errorbuf) {
-        errorbuf_len = 0;
-    }
-    else {
-        errorbuf[errorbuf_len] = 0;
-        strcat(errorbuf, p);
-        errorbuf_len = newlen;
-    }
-
+    // cleanup
     free(p);
 
-    // write errors to efivars and reboot system
-    if(fatal) {
-        LOGE(
-            "FATAL ERROR - LOG TRACE:\n"
-            "===================================\n"
-            "%s"
-            "===================================\n"
-            "\n",
-            errorbuf
-        );
-        efivars_report_errorbuf();
-        android_reboot(ANDROID_RB_RESTART, 0, 0);
-        exit(1);
-    }
-
-    // return error code
-    return error;
-}
-
-const char* efivars_get_errorbuf(void) {
-    return errorbuf;
+    return 0;
 }

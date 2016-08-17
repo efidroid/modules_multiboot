@@ -26,7 +26,6 @@
 #define LOG_TAG "DYNFILEFS"
 #include <lib/log.h>
 
-#include <lib/efivars.h>
 #include <util.h>
 
 #define DYNFILE_MAGIC "DynfileFS2"

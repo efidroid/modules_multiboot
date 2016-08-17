@@ -25,7 +25,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#include <lib/efivars.h>
 #include <lib/fs_mgr.h>
 #include <lib/uevent.h>
 #include <lib/mounts.h>

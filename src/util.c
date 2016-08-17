@@ -29,7 +29,6 @@
 
 #include <lib/klog.h>
 #include <lib/fs_mgr.h>
-#include <lib/efivars.h>
 #include <blkid/blkid.h>
 
 #include <common.h>
