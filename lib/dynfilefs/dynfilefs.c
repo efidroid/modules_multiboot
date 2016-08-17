@@ -229,11 +229,8 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
     }
 
     // build fuse arguments
-    argv[argc++] = strdup("dynfilefs");
-    argv[argc++] = strdup(mountpoint);
-
-    if(!argv[0] || !argv[1])
-        return -ENOMEM;
+    argv[argc++] = safe_strdup("dynfilefs");
+    argv[argc++] = safe_strdup(mountpoint);
 
     // open save data file
     fp = fopen(save_path, "r+");
@@ -294,7 +291,7 @@ int dynfilefs_mount(const char* storage_file, unsigned long blocks, const char* 
 
     pid_t pid;
 
-    pid = fork();
+    pid = safe_fork();
     if (!pid) {
         ret = fuse_main(argc, argv, &dynfilefs_oper, NULL);
     }

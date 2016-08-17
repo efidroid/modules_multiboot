@@ -191,7 +191,7 @@ static void sort_index_block(off_t curr_index, off_t curr_pos, off_t curr_offset
       // and write current offset+target at the puthere position
       size = curr_pos - puthere;
       fseeko(fp, puthere, SEEK_SET);
-      buf = malloc(size); if (buf == NULL) return;
+      buf = safe_malloc(size); if (buf == NULL) return;
       ret = fread(buf, size, 1, fp); if (ret < 0) return;
       fseeko(fp, puthere, SEEK_SET);
       ret = fwrite(&curr_offset, sizeof(curr_offset), 1, fp);
