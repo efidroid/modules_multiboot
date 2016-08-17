@@ -561,8 +561,7 @@ int util_create_partition_backup_ex(const char* device, const char* file, unsign
         util_block_num(device, &num_blocks);
 
     // create raw image if it doesn't exists yet
-    // or if it's size doesn't match the original partition
-    if(force || !util_exists(file, false) || util_filesize(file, false)!=num_blocks*512llu) {
+    if(force || !util_exists(file, false)) {
         rc = util_dd(device, file, num_blocks);
         if(rc) {
             LOGE("Can't copy %s to %s: %d\n", device, file, rc);
