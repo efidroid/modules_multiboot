@@ -54,8 +54,6 @@ void __user * syshookutils_copy_to_child(syshook_process_t* process, void* buf, 
 }
 
 int syshookutils_get_absolute_path(syshook_process_t* process, int dfd, const char* filename, char* buf, size_t bufsz) {
-    int rc;
-
     buf[0] = 0;
     if(filename[0]!='/') {
         const char* filenameptr = filename;
@@ -73,10 +71,7 @@ int syshookutils_get_absolute_path(syshook_process_t* process, int dfd, const ch
                 if(cwdlen>0 && cwd[cwdlen-1]=='/')
                     trailingslash = 1;
 
-                rc = snprintf(buf, bufsz, "%s%s%s", cwd, (trailingslash?"":"/"), filenameptr);
-                if(rc<0 || (size_t)rc>=bufsz) {
-                    return -1;
-                }
+                SAFE_SNPRINTF_RET(LOGE, -1, buf, bufsz, "%s%s%s", cwd, (trailingslash?"":"/"), filenameptr);
             }
         }
 
@@ -90,10 +85,7 @@ int syshookutils_get_absolute_path(syshook_process_t* process, int dfd, const ch
                 if(pathlen>0 && (fdinfo->path)[pathlen-1]=='/')
                     trailingslash = 1;
 
-                rc = snprintf(buf, bufsz, "%s%s%s", fdinfo->path, (trailingslash?"":"/"), filenameptr);
-                if(rc<0 || (size_t)rc>=bufsz) {
-                    return -1;
-                }
+                SAFE_SNPRINTF_RET(LOGE, -1, buf, bufsz, "%s%s%s", fdinfo->path, (trailingslash?"":"/"), filenameptr);
             }
         }
     }
@@ -105,14 +97,14 @@ int syshookutils_get_absolute_path(syshook_process_t* process, int dfd, const ch
 }
 
 fdinfo_t* fdinfo_dup(fdinfo_t* olditem) {
-    fdinfo_t* newitem = calloc(1, sizeof(fdinfo_t));
+    fdinfo_t* newitem = safe_calloc(1, sizeof(fdinfo_t));
     if(!newitem) {
         return NULL;
     }
 
     pthread_mutex_init(&newitem->lock, NULL);
     newitem->fd = olditem->fd;
-    newitem->path = olditem->path?strdup(olditem->path):NULL;
+    newitem->path = olditem->path?safe_strdup(olditem->path):NULL;
     newitem->flags = olditem->flags;
     newitem->major = olditem->major;
     newitem->minor = olditem->minor;
@@ -130,14 +122,14 @@ void fdinfo_add(syshook_process_t* process, int fd, const char* path, int flags,
         fdinfo_free(olditem, 1);
     }
 
-    fdinfo_t* newitem = calloc(1, sizeof(fdinfo_t));
+    fdinfo_t* newitem = safe_calloc(1, sizeof(fdinfo_t));
     if(!newitem) {
         return;
     }
 
     pthread_mutex_init(&newitem->lock, NULL);
     newitem->fd = fd;
-    newitem->path = path?strdup(path):NULL;
+    newitem->path = path?safe_strdup(path):NULL;
     newitem->flags = flags;
     newitem->major = major;
     newitem->minor = minor;
@@ -179,7 +171,7 @@ void fdinfo_free(fdinfo_t* fdinfo, int remove_from_list) {
 
 fdtable_t* fdtable_create(void) {
     // allocate new fdtable
-    fdtable_t* fdtable = calloc(1, sizeof(fdtable_t));
+    fdtable_t* fdtable = safe_calloc(1, sizeof(fdtable_t));
     if(!fdtable) return NULL;
     list_initialize(&fdtable->files);
     pthread_mutex_init(&fdtable->lock, NULL);
@@ -244,7 +236,6 @@ int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* mi
     rc = scan_mounted_volumes();
     if(rc) {
         MBABORT("Can't scan mounted volumes\n");
-        return rc;
     }
 
     volume =  find_mounted_volume_by_mount_point(mountpoint);
@@ -284,30 +275,23 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     char* espdir = util_get_espdir(mountpoint);
     if(!espdir) {
         MBABORT("Can't get ESP directory: %s\n", strerror(errno));
-        return -1;
     }
 
     // get ESP filename
     char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
     if(!espfilename) {
         MBABORT("Can't get filename\n");
-        return -1;
     }
 
     // copy loop to esp
     rc = util_dd(replacement->loopdevice, espfilename, 0);
     if(rc) {
         MBABORT("Can't create partition image\n");
-        return -1;
     }
 
     if(!volume) {
         // unmount ESP
-        rc = umount(MBPATH_ESP);
-        if(rc) {
-            MBABORT("Can't unmount ESP: %s\n", strerror(errno));
-            return -1;
-        }
+        SAFE_UMOUNT(MBPATH_ESP);
     }
 
     // cleanup
@@ -323,10 +307,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
 
     if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND) {
         // mount loop
-        rc = util_mount(replacement->loopdevice, MBPATH_STUB, NULL, 0, NULL);
-        if(rc) {
-            return 0;
-        }
+        SAFE_MOUNT(replacement->loopdevice, MBPATH_STUB, NULL, 0, NULL);
 
         // create id file
         if(!util_exists(MBPATH_STUB_IDFILE, false)) {
@@ -336,31 +317,21 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
             int fd = open(MBPATH_STUB_IDFILE, O_RDWR|O_CREAT);
             if(fd<0) {
                 MBABORT("Can't create ID file\n");
-                return -1;
             }
             close(fd);
 
             // build format command
-            rc = snprintf(buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->u.multiboot.partpath);
-            if(rc<0 || (size_t)rc >= sizeof(buf)) {
-                MBABORT("Can't build format command\n");
-                return -1;
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->u.multiboot.partpath);
 
             // format bind source
             rc = util_shell(buf);
             if(rc) {
                 MBABORT("Can't format bind source at %s\n", replacement->u.multiboot.partpath);
-                return -1;
             }
         }
 
         // unmount loop device
-        rc = umount(MBPATH_STUB);
-        if(rc) {
-            MBABORT("Can't unmount %s: %s\n", MBPATH_STUB, strerror(errno));
-            return -1;
-        }
+        SAFE_UMOUNT(MBPATH_STUB);
     }
 
     return 0;

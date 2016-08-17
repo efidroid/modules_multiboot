@@ -84,7 +84,6 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     rc = syshookutils_get_absolute_path(process, dfd, kfilename, abspath, sizeof(abspath));
     if(rc) {
         MBABORT("can't get absolute path\n");
-        return -1;
     }
 
     // get lindev
@@ -105,7 +104,6 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     uabspath = syshookutils_copy_to_child(process, replacement->loopdevice, uabspath_len);
     if(!uabspath) {
         MBABORT("can't copy path to child\n");
-        return -1;
     }
 
     // use loop device
@@ -190,18 +188,13 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             LOGV("bind mount datamedia for: %s %s\n", kdevname, kdirname);
 
             // build target dir path
-            rc = snprintf(buf, sizeof(buf), "%s/media", kdirname);
-            if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                MBABORT("Can't build path for datamedia\n");
-                return -1;
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kdirname);
 
             // create source dir
             if(!util_exists(MBPATH_DATA"/media", false)) {
                 rc = util_mkdir(MBPATH_DATA"/media");
                 if(rc) {
                     MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
-                    return -1;
                 }
             }
 
@@ -210,7 +203,6 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
                 rc = util_mkdir(buf);
                 if(rc) {
                     MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
-                    return -1;
                 }
             }
 
@@ -218,7 +210,6 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
             rc = mount(MBPATH_DATA"/media", buf, NULL, MS_BIND, NULL);
             if(rc) {
                 MBABORT("Can't bind mount datamedia: %s\n", strerror(errno));
-                return -1;
             }
         }
 
@@ -232,7 +223,6 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         udevname = syshookutils_copy_to_child(process, replacement->loopdevice, udevname_len);
         if(!udevname) {
             MBABORT("can't copy path to child\n");
-            return -1;
         }
 
         syshook_argument_set(process, 0, (long)udevname);
@@ -281,25 +271,19 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
         rc = scan_mounted_volumes();
         if(rc) {
             MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
-            return -1;
         }
 
         if(!strcmp(kname, "/data")) {
             // build target dir path
-            rc = snprintf(buf, sizeof(buf), "%s/media", kname);
-            if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                MBABORT("Can't build path for datamedia\n");
-                return -1;
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kname);
 
             // check if datamedia is mounted at this path
             const mounted_volume_t* volume = find_mounted_volume_by_mount_point(buf);
             if(volume) {
                 LOGV("unmount datamedia for %s\n", kname);
-                rc = umount(buf);
+                SAFE_UMOUNT(buf);
                 if(rc) {
                     MBABORT("Can't unmount datamedia for %s\n", kname);
-                    return -1;
                 }
             }
         }

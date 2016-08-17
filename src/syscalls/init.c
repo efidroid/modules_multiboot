@@ -23,17 +23,14 @@ multiboot_data_t* syshook_multiboot_data = NULL;
 static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
     if(!process){
         MBABORT("process is NULL\n");
-        return -1;
     }
     if(process->pdata){
         MBABORT("pdata does already exist\n");
-        return -1;
     }
 
-    syshook_pdata_t* pdata = calloc(1, sizeof(syshook_pdata_t));
+    syshook_pdata_t* pdata = safe_calloc(1, sizeof(syshook_pdata_t));
     if(!pdata) {
         MBABORT("no pdata\n");
-        return -1;
     }
 
     syshook_process_t* pprocess = get_process_data(process->context, process->ppid);
@@ -41,11 +38,9 @@ static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
         syshook_pdata_t* ppdata = pprocess->pdata;
         if(!ppdata) {
             MBABORT("no pdata\n");
-            return -1;
         }
         if(!ppdata->fdtable) {
             MBABORT("no fdtable\n");
-            return -1;
         }
 
         // use the same fdtable
@@ -78,7 +73,6 @@ static int multiboot_trace_destroy_process(UNUSED syshook_process_t* process) {
     syshook_pdata_t* pdata = process->pdata;
     if(!pdata) {
         MBABORT("no pdata\n");
-        return -1;
     }
 
     pthread_mutex_lock(&pdata->fdtable->lock);
