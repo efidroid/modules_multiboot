@@ -231,29 +231,8 @@ int boot_recovery(void) {
     }
 
     else {
-        unsigned long mountflags = 0;
-        const void* data = NULL;
-
-        // find ESP in the rom's fstab
-        struct fstab_rec* esprec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, multiboot_data->espdev);
-        if(esprec) {
-            // use the ROM's mount options for this partition
-            mountflags = esprec->flags;
-            data = (void*)esprec->fs_options;
-            LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
-        }
-
         // mount ESP
-        rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-        if(rc) {
-            // mount without flags
-            LOGI("mount ESP without flags\n");
-            mountflags = 0;
-            data = NULL;
-            rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-            if(rc)
-                MBABORT("Can't mount ESP: %s\n", strerror(errno));
-        }
+        util_mount_esp();
 
         // get espdir
         char* espdir = util_get_espdir(MBPATH_ESP);

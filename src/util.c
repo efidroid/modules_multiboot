@@ -652,3 +652,33 @@ multiboot_partition_t* util_mbpart_by_name(const char* name) {
 pid_t gettid(void) {
     return (pid_t)syscall(SYS_gettid);
 }
+
+void util_mount_esp(void) {
+    int rc;
+    unsigned long mountflags = 0;
+    const void* data = NULL;
+
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    // find ESP in the rom's fstab
+    struct fstab_rec* esprec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, multiboot_data->espdev);
+    if(esprec) {
+        // use the ROM's mount options for this partition
+        mountflags = esprec->flags;
+        data = (void*)esprec->fs_options;
+        LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
+    }
+
+    // mount ESP
+    rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
+    if(rc) {
+        // mount without flags
+        LOGI("mount ESP without flags\n");
+        mountflags = 0;
+        data = NULL;
+        rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
+        if(rc) {
+            MBABORT("Can't mount ESP: %s\n", strerror(errno));
+        }
+    }
+}

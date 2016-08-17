@@ -274,31 +274,8 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         mountpoint = volume->mount_point;
     }
     else {
-        unsigned long mountflags = 0;
-        const void* data = NULL;
-
-        // find ESP in the rom's fstab
-        struct fstab_rec* esprec = fs_mgr_get_by_ueventblock(syshook_multiboot_data->romfstab, syshook_multiboot_data->espdev);
-        if(esprec) {
-            // use the ROM's mount options for this partition
-            mountflags = esprec->flags;
-            data = (void*)esprec->fs_options;
-            LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
-        }
-
         // mount ESP
-        rc = uevent_mount(syshook_multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-        if(rc) {
-            // mount without flags
-            LOGI("mount ESP without flags\n");
-            mountflags = 0;
-            data = NULL;
-            rc = uevent_mount(syshook_multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-            if(rc) {
-                MBABORT("Can't mount ESP: %s\n", strerror(errno));
-                return -1;
-            }
-        }
+        util_mount_esp();
 
         mountpoint = MBPATH_ESP;
     }
