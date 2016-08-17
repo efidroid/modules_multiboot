@@ -52,6 +52,10 @@ void klog_init(void)
                 return;
         fcntl(klog_fd, F_SETFD, FD_CLOEXEC);
         unlink(name);
+
+        // redirect stdout and stderr to kmsg
+        dup2(klog_fd, 1);
+        dup2(klog_fd, 2);
     }
 }
 
