@@ -27,6 +27,12 @@
     } \
 }while(0)
 
+#define SAFE_MOUNT(src, target, fstype, flags, data) do{ \
+    if(util_mount(src, target, fstype, flags, data)) { \
+        MBABORT("can't mount %s on %s: %s\n", src, target, strerror(errno)); \
+    } \
+}while(0)
+
 char *safe_strdup(const char *s);
 pid_t safe_fork(void);
 void* safe_malloc(size_t size);
