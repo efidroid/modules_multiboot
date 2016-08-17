@@ -36,9 +36,6 @@
 #include <lib/log.h>
 
 PAYLOAD_IMPORT(fstab_multiboot);
-PAYLOAD_IMPORT(busybox);
-PAYLOAD_IMPORT(mke2fs);
-PAYLOAD_IMPORT(mkfs_f2fs);
 static multiboot_data_t multiboot_data = {0};
 
 multiboot_data_t* multiboot_get_data(void) {
