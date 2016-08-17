@@ -16,10 +16,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include <lib/log.h>
 #include <lib/klog.h>
 #include <lib/android_reboot.h>
+#include <common.h>
 
 static int log_level = LOG_DEFAULT_LEVEL;
 
@@ -45,6 +47,19 @@ void log_vwrite(int level, const char *fmt, va_list ap)
     vfprintf(stderr, fmt, ap);
 }
 
+static void sim_kpan(void) {
+    int fd = open(MBPATH_PROC"/sysrq-trigger", O_WRONLY);
+    if(fd<0) {
+        fd = open("/proc/sysrq-trigger", O_WRONLY);
+        if(fd<0) return;
+    }
+
+    char c = 'c';
+    write(fd, &c, 1);
+
+    close(fd);
+}
+
 void log_write(int level, const char *fmt, ...)
 {
     va_list ap;
@@ -55,6 +70,10 @@ void log_write(int level, const char *fmt, ...)
     if(level>=LOGF_LEVEL) {
         // try to reboot
         android_reboot(ANDROID_RB_RESTART, 0, 0);
+
+        // simulate kernel panic
+        LOGE("reboot failed, trigger kernel panic\n");
+        sim_kpan();
 
         // exit if that fails(we're init)
         exit(1);
