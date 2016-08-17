@@ -84,10 +84,13 @@ int boot_recovery(void) {
                 MBABORT("Can't get blockinfo for '%s'\n", rec->blk_device);
             }
 
-            // build path
+            // path to multiboot rom dir
             SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-
             char* partpath = safe_strdup(buf);
+
+            // path to loop device
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
+            char* loopdevice = safe_strdup(buf);
 
             // stat path
             struct stat sb;
@@ -107,7 +110,6 @@ int boot_recovery(void) {
             }
 
             // get real device
-            char* loopdevice = NULL;
             char* device = util_device_from_mbname(part->name);
             if(!device) {
                 MBABORT("Can't get device for '%s'\n", part->name);
@@ -122,24 +124,20 @@ int boot_recovery(void) {
                     }
                 }
 
-                // build path for loop device
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
-                loopdevice = safe_strdup(buf);
-
-                // get partition size
+                // get size of original partition
                 unsigned long num_blocks = 0;
                 rc = util_block_num(device, &num_blocks);
                 if(rc || num_blocks==0) {
                     MBABORT("Can't get size of device %s\n", rec->blk_device);
                 }
 
-                // mkfs needs much time for large filesystems, so just use max 1GB
+                // mkfs needs much time for large filesystems, so just use max 200MB
                 num_blocks = MIN(num_blocks, (200*1024*1024)/512llu);
 
-                // build path for dynfilefs mountpopint
+                // path to dynfilefs mountpopint
                 SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
 
-                // build path for dynfilefs storage file
+                // path to dynfilefs storage file
                 SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
 
                 // mount dynfilefs
@@ -148,7 +146,7 @@ int boot_recovery(void) {
                     MBABORT("can't mount dynfilefs\n");
                 }
 
-                // build path for stub partition backup
+                // path to stub partition backup (in dynfs mountpoint)
                 SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/loop.fs", buf2);
 
                 // create new loop node
@@ -192,10 +190,6 @@ int boot_recovery(void) {
                 if(rc) {
                     MBABORT("Can't create file '%s'\n", partpath);
                 }
-
-                // build loop path
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/mbloop_%s", part->name);
-                loopdevice = safe_strdup(buf);
 
                 // create new node
                 rc = util_make_loop(loopdevice);
@@ -282,10 +276,10 @@ int boot_recovery(void) {
                 MBABORT("Can't create partition image\n");
             }
 
-            // build path for loop device
+            // path to loop device
             SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%u:%u", bi->major, bi->minor);
 
-            // build path for temporary partition backup
+            // path to temporary partition backup
             SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/loopfile:%u:%u", bi->major, bi->minor);
 
             // create temporary partition backup
@@ -334,5 +328,5 @@ int boot_recovery(void) {
         MBABORT("Can't trace init: %s\n", strerror(errno));
     }
 
-    MBABORT_RET("tracy returned\n");
+    MBABORT_RET("init returned\n");
 }
