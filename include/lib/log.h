@@ -70,19 +70,6 @@ __END_DECLS
     return -1; \
 } while(0)
 
-#define CHECK_SNPRINTF(rc, sz, fn) do{ \
-    if((rc)<0 || (size_t)(rc) >=(sz)) { \
-        fn("snprintf error\n"); \
-    } \
-}while(0)
-
-#define CHECK_SNPRINTF_RET(rc, sz, fn, ret) do{ \
-    if((rc)<0 || (size_t)(rc) >=(sz)) { \
-        fn("snprintf error\n"); \
-        return (ret); \
-    } \
-}while(0)
-
 #define LOG_DEFAULT_LEVEL  LOGD_LEVEL  /* messages >= this level are logged */
 
 #endif

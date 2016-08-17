@@ -17,6 +17,16 @@
 #ifndef _SAFE_H_
 #define _SAFE_H_
 
+#define SNPRINTF_ERROR(rc, sz) ((rc)<0 || (size_t)(rc) >=(sz))
+
+#define SAFE_SNPRINTF_RET(fn, rc, s, n, fmt, ...) do{ \
+    int safe_snprintf_rc = snprintf((s), (n), (fmt), ##__VA_ARGS__); \
+    if(safe_snprintf_rc<0 || (size_t)safe_snprintf_rc >=(n)) { \
+        fn("snprintf error\n"); \
+        return (rc); \
+    } \
+}while(0)
+
 char *safe_strdup(const char *s);
 
 #endif

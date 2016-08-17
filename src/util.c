@@ -480,7 +480,6 @@ out:
 }
 
 char* util_get_espdir(const char* mountpoint) {
-    int rc;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
     char* ret = NULL;
@@ -505,13 +504,11 @@ char* util_get_espdir(const char* mountpoint) {
     }
 
     // build UEFIESP mountpoint
-    rc = snprintf(buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
-    CHECK_SNPRINTF_RET(rc, sizeof(buf), LOGE, NULL);
+    SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
 
     if(!util_exists(buf, true) && is_datamedia) {
         // build UEFIESP mountpoint
-        rc = snprintf(buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
-        CHECK_SNPRINTF_RET(rc, sizeof(buf2), LOGE, NULL);
+        SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
 
         if(util_exists(buf2, true))
             ret = safe_strdup(buf2);
@@ -544,7 +541,7 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     // copy path
     rc = snprintf(buf, sizeof(buf), "%s", espdir);
     free(espdir);
-    CHECK_SNPRINTF_RET(rc, sizeof(buf), LOGE, NULL);
+    if(SNPRINTF_ERROR(rc, sizeof(buf))) return NULL;
 
     // build partition name
     char* name = util_basename(rec->mount_point);
@@ -554,8 +551,8 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
     }
 
     // create path for loop image
-    rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", buf, name);
-    CHECK_SNPRINTF_RET(rc, sizeof(buf2), LOGE, NULL);
+    SAFE_SNPRINTF_RET(LOGE, NULL, buf2, PATH_MAX, "%s/partition_%s.img", buf, name);
+    free(name);
 
     // duplicate buffer
     return safe_strdup(buf2);

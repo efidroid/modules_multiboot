@@ -226,7 +226,7 @@ int boot_android(void) {
         // child
         else {
             // add post-fs-data event
-            snprintf(buf, PATH_MAX, "\n\n"
+            SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
                      "on post-fs-data\n"
                      "    start mbpostfs\n"
                      "    wait "POSTFS_NOTIFICATION_FILE"\n"
