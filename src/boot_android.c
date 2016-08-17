@@ -112,8 +112,8 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
         }
 
         // create path for backup node
-        rc = snprintf(buf3, PATH_MAX, "%s/replacement_backup_%s", MBPATH_DEV, name);
-        if(rc<0 || rc>=PATH_MAX) {
+        rc = snprintf(buf3, sizeof(buf3), "%s/replacement_backup_%s", MBPATH_DEV, name);
+        if(SNPRINTF_ERROR(rc, sizeof(buf3))) {
             LOGE("Can't build name for partition image\n");
             goto finish;
         }
@@ -130,8 +130,8 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
         util_block_num(blk_device, &num_blocks);
 
         // create path for loop image
-        rc = snprintf(buf2, PATH_MAX, "%s/partition_%s.img", esp_mountpoint, name);
-        if(rc<0 || rc>=PATH_MAX) {
+        rc = snprintf(buf2, sizeof(buf2), "%s/partition_%s.img", esp_mountpoint, name);
+        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
             LOGE("Can't build name for partition image\n");
             goto finish;
         }
@@ -281,10 +281,7 @@ int boot_android(void) {
             multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
             if(part) {
                 // build path
-                rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-                if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    MBABORT("Can't build path for partition '%s'\n", part->name);
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
 
                 if(part->type==MBPART_TYPE_BIND) {
                     blk_device = buf;
@@ -292,10 +289,7 @@ int boot_android(void) {
                 }
                 else {
                     // build loop path
-                    rc = snprintf(buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
-                    if(rc<0 || (size_t)rc>=sizeof(buf2)) {
-                        MBABORT("Can't build path for loop device\n");
-                    }
+                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
 
                     // create new node
                     rc = util_make_loop(buf2);
@@ -315,16 +309,10 @@ int boot_android(void) {
 
             // allocate line buffer
             size_t linelen = strlen(blk_device) + strlen(rec->mount_point) + strlen(rec->fs_type) + strlen(mnt_flags) + strlen(rec->fs_mgr_flags_orig) + 6;
-            char* line = malloc(linelen);
-            if(!line) {
-                MBABORT("Can't allocate memory\n");
-            }
+            char* line = safe_malloc(linelen);
 
             // build line
-            rc = snprintf(line, linelen, "%s %s %s %s %s\n", blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
-            if(rc<0 || (size_t)rc>=linelen) {
-                MBABORT("Can't build fstab line\n");
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, line, linelen, "%s %s %s %s %s\n", blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
 
             // write line
             CHECK_WRITE(fd, line);
