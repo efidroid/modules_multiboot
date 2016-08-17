@@ -29,5 +29,7 @@
 
 char *safe_strdup(const char *s);
 pid_t safe_fork(void);
+void* safe_malloc(size_t size);
+void* safe_calloc(size_t num, size_t size);
 
 #endif

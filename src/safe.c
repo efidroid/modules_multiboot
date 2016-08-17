@@ -23,3 +23,21 @@ pid_t safe_fork(void) {
 
     return pid;
 }
+
+void* safe_malloc(size_t size) {
+    char* ret = malloc(size);
+    if(!ret) {
+        MBABORT("malloc(%u): %s\n", size, strerror(ENOMEM));
+    }
+
+    return ret;
+}
+
+void* safe_calloc(size_t num, size_t size) {
+    char* ret = calloc(num, size);
+    if(!ret) {
+        MBABORT("calloc(%u, %u): %s\n", num, size, strerror(ENOMEM));
+    }
+
+    return ret;
+}
