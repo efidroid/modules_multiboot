@@ -41,9 +41,6 @@ void log_vwrite(int level, const char *fmt, va_list ap)
 {
     if (level < log_level) return;
 
-    // forward to klog
-    klog_vwrite(KLOG_DEFAULT_LEVEL, fmt, ap);
-
     // print
     vfprintf(stderr, fmt, ap);
 }
