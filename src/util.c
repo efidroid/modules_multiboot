@@ -139,7 +139,7 @@ int util_mkdir(const char *dir) {
     size_t len;
     int rc = 0;
 
-    snprintf(tmp, sizeof(tmp), "%s", dir);
+    SAFE_SNPRINTF_RET(LOGE, -1, tmp, sizeof(tmp), "%s", dir);
     len = strlen(tmp);
 
     if(tmp[len - 1] == '/')
@@ -395,22 +395,22 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
     par[i++] = "dd";
 
     // input
-    snprintf(buf, ARRAY_SIZE(buf), "if=%s", source);
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "if=%s", source);
     buf_if = safe_strdup(buf);
     par[i++] = buf_if;
 
     // output
-    snprintf(buf, ARRAY_SIZE(buf), "of=%s", target);
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "of=%s", target);
     buf_of = safe_strdup(buf);
     par[i++] = buf_of;
 
     // blocksize (get_blknum returns 512byte blocks)
-    snprintf(buf, ARRAY_SIZE(buf), "bs=%d", 512);
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "bs=%d", 512);
     buf_bs = safe_strdup(buf);
     par[i++] = buf_bs;
 
     // count
-    snprintf(buf, ARRAY_SIZE(buf), "count=%lu", blocks);
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "count=%lu", blocks);
     buf_count = safe_strdup(buf);
     par[i++] = buf_count;
 
@@ -579,7 +579,6 @@ int util_create_partition_backup(const char* device, const char* file) {
 
 char* util_getmbpath_from_device(const char* device) {
     multiboot_data_t* multiboot_data = multiboot_get_data();
-    int rc;
     char buf[PATH_MAX];
 
     if(!multiboot_data->blockinfo) {
@@ -591,10 +590,7 @@ char* util_getmbpath_from_device(const char* device) {
         return NULL;
 
     // build dev name
-    rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
-        return NULL;
-    }
+    SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
 
     return safe_strdup(buf);
 }
@@ -621,7 +617,6 @@ char* util_device_from_mbname(const char* name) {
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
     int i;
-    int rc;
     char buf[PATH_MAX];
 
     for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
@@ -631,9 +626,7 @@ char* util_device_from_mbname(const char* name) {
             uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
             if (!bi) return NULL;
 
-            rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-            if(rc<0 || (size_t)rc>=sizeof(buf))
-                return NULL;
+            SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
 
             return safe_strdup(buf);
         }
