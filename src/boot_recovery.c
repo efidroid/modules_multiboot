@@ -85,15 +85,9 @@ int boot_recovery(void) {
             }
 
             // build path
-            rc = snprintf(buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-            if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                MBABORT("Can't build path for partition '%s'\n", part->name);
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
 
-            char* partpath = strdup(buf);
-            if(!partpath) {
-                MBABORT("Can't duplicate path for partition '%s'\n", part->name);
-            }
+            char* partpath = safe_strdup(buf);
 
             // stat path
             struct stat sb;
@@ -129,14 +123,8 @@ int boot_recovery(void) {
                 }
 
                 // build path for loop device
-                rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
-                if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    MBABORT("Can't build temp partition path\n");
-                }
-                loopdevice = strdup(buf);
-                if(!loopdevice) {
-                    MBABORT("Can't duplicate path for loop device\n");
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
+                loopdevice = safe_strdup(buf);
 
                 // get partition size
                 unsigned long num_blocks = 0;
@@ -149,16 +137,10 @@ int boot_recovery(void) {
                 num_blocks = MIN(num_blocks, (200*1024*1024)/512llu);
 
                 // build path for dynfilefs mountpopint
-                rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
-                if(rc<0 || (size_t)rc>=sizeof(buf2)) {
-                    MBABORT("Can't build dynfilefs partition path\n");
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
 
                 // build path for dynfilefs storage file
-                rc = snprintf(buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
-                if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    MBABORT("Can't build dynfilefs storage path\n");
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
 
                 // mount dynfilefs
                 rc = dynfilefs_mount(buf, num_blocks, buf2);
@@ -167,10 +149,7 @@ int boot_recovery(void) {
                 }
 
                 // build path for stub partition backup
-                rc = snprintf(buf, sizeof(buf), "%s/loop.fs", buf2);
-                if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    MBABORT("Can't build temp partition path\n");
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/loop.fs", buf2);
 
                 // create new loop node
                 rc = util_make_loop(loopdevice);
@@ -194,10 +173,7 @@ int boot_recovery(void) {
                 }
 
                 // mount loop device
-                rc = util_mount(loopdevice, MBPATH_STUB, fstype, 0, NULL);
-                if(rc) {
-                    MBABORT("Can't mount %s on %s: %s\n", loopdevice, MBPATH_STUB, strerror(errno));
-                }
+                SAFE_MOUNT(loopdevice, MBPATH_STUB, fstype, 0, NULL);
 
                 // create id file
                 int fd = open(MBPATH_STUB_IDFILE, O_RDWR|O_CREAT);
@@ -221,14 +197,8 @@ int boot_recovery(void) {
                 }
 
                 // build loop path
-                rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/mbloop_%s", part->name);
-                if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                    MBABORT("Can't build path for loop device\n");
-                }
-                loopdevice = strdup(buf);
-                if(!loopdevice) {
-                    MBABORT("Can't duplicate path for loop device\n");
-                }
+                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/mbloop_%s", part->name);
+                loopdevice = safe_strdup(buf);
 
                 // create new node
                 rc = util_make_loop(loopdevice);
@@ -243,7 +213,7 @@ int boot_recovery(void) {
                 }
             }
 
-            part_replacement_t* pdata = calloc(sizeof(part_replacement_t), 1);
+            part_replacement_t* pdata = safe_calloc(sizeof(part_replacement_t), 1);
             if(!pdata) {
                 MBABORT("Can't allocate hook device\n");
             }
@@ -295,11 +265,7 @@ int boot_recovery(void) {
         }
 
         // copy path
-        rc = snprintf(buf, sizeof(buf), "%s", espdir);
-        free(espdir);
-        if(rc<0 || (size_t)rc>=sizeof(buf)) {
-            MBABORT("Can't copy ESP dir path: %s\n", espdir);
-        }
+        SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s", espdir);
 
         // create UEFIESP directory
         if(!util_exists(buf, true)) {
@@ -341,16 +307,10 @@ int boot_recovery(void) {
             }
 
             // build path for loop device
-            rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%u:%u", bi->major, bi->minor);
-            if(rc<0 || (size_t)rc>=sizeof(buf)) {
-                MBABORT("Can't build temp partition path\n");
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%u:%u", bi->major, bi->minor);
 
             // build path for temporary partition backup
-            rc = snprintf(buf2, sizeof(buf2), MBPATH_ROOT"/loopfile:%u:%u", bi->major, bi->minor);
-            if(rc<0 || (size_t)rc>=sizeof(buf2)) {
-                MBABORT("Can't build temp partition path\n");
-            }
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/loopfile:%u:%u", bi->major, bi->minor);
 
             // create temporary partition backup
             rc = util_cp(espfilename, buf2);
@@ -370,7 +330,7 @@ int boot_recovery(void) {
                 MBABORT("Can't setup loop device at %s for %s\n", buf, buf2);
             }
 
-            part_replacement_t* pdata = calloc(sizeof(part_replacement_t), 1);
+            part_replacement_t* pdata = safe_calloc(sizeof(part_replacement_t), 1);
             if(!pdata) {
                 MBABORT("Can't allocate hook device\n");
             }
@@ -378,7 +338,7 @@ int boot_recovery(void) {
             pthread_mutex_init(&pdata->lock, NULL);
             pdata->major = bi->major;
             pdata->minor = bi->minor;
-            pdata->loopdevice = strdup(buf);
+            pdata->loopdevice = safe_strdup(buf);
             pdata->u.native.rec = rec;
 
             list_add_tail(&multiboot_data->replacements, &pdata->node);
