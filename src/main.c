@@ -58,20 +58,31 @@ int trigger_postfsdata_main(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    if(!strcmp(argv[0], MBPATH_TRIGGER_POSTFS_DATA)) {
+    if(!strcmp(argv[0], "trigger-postfs-data")) {
         return trigger_postfsdata_main(argc, argv);
     }
-    else if(!strcmp(argv[0], MBPATH_MKE2FS)) {
+    else if(!strcmp(argv[0], "mke2fs")) {
         return mke2fs_main(argc, argv);
     }
-    else if(!strcmp(argv[0], MBPATH_BUSYBOX)) {
+    else if(!strcmp(argv[0], "busybox")) {
         return busybox_main(argc, argv);
     }
-    else {
-        int rc = multiboot_main(argc, argv);
-        if(rc) {
-            MBABORT("multiboot_main returned: %s\n", strerror(-rc));
+
+    else if(argc>=2) {
+        if(!strcmp(argv[1], "trigger-postfs-data")) {
+            return trigger_postfsdata_main(argc-1, argv+1);
         }
+        else if(!strcmp(argv[1], "mke2fs")) {
+            return mke2fs_main(argc-1, argv+1);
+        }
+        else if(!strcmp(argv[1], "busybox")) {
+            return busybox_main(argc-1, argv+1);
+        }
+    }
+
+    int rc = multiboot_main(argc, argv);
+    if(rc) {
+        MBABORT("multiboot_main returned: %s\n", strerror(-rc));
     }
 
     return 0;
