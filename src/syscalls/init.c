@@ -33,7 +33,7 @@ static int multiboot_trace_create_process(UNUSED syshook_process_t* process) {
         MBABORT("no pdata\n");
     }
 
-    syshook_process_t* pprocess = get_process_data(process->context, process->ppid);
+    syshook_process_t* pprocess = get_process_by_tid(process->context, process->ppid);
     if(pprocess) {
         syshook_pdata_t* ppdata = pprocess->pdata;
         if(!ppdata) {
