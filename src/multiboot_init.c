@@ -22,6 +22,10 @@
 #include <unistd.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
+#include <sys/poll.h>
+#include <sys/socket.h>
+#include <sys/mman.h>
+#include <linux/netlink.h>
 
 #include <lib/cmdline.h>
 #include <lib/mounts.h>
@@ -94,52 +98,89 @@ static void import_kernel_nv(char *name)
     }
 }
 
-static int device_matches(const char* path, const char* guid) {
+static uevent_block_t* get_blockinfo_for_guid(const char* guid) {
     int rc = 0;
     blkid_tag_iterate iter;
     const char *type, *value;
     blkid_cache cache = NULL;
     pid_t pid;
+    char path[PATH_MAX];
+
+    // allocate shared memory
+    uevent_block_t** result = mmap(NULL, sizeof(void*), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if(!result)  {
+        MBABORT("mmap failed: %s\n", strerror(errno));
+    }
+    *result = NULL;
 
     // libblkid uses hardcoded paths for /sys and /dev
     // to make it work with our custom environmont (without modifying the libblkid code)
     // we have to chroot to /multiboot
     pid = safe_fork();
     if (!pid) {
+        // chroot
         rc = chroot("/multiboot");
         if(rc<0) {
             MBABORT("chroot error: %s\n", strerror(errno));
         }
 
-        // get dev
-        blkid_get_cache(&cache, NULL);
-        blkid_dev dev = blkid_get_dev(cache, path, BLKID_DEV_NORMAL);
-        if(!dev) {
-            LOGV("Device %s not found\n", path);
-            exit(0);
+        uevent_block_t *event;
+        list_for_every_entry(multiboot_data.blockinfo, event, uevent_block_t, node) {
+            rc = snprintf(path, sizeof(path), "/dev/block/%s", event->devname);
+            if(SNPRINTF_ERROR(rc, sizeof(path))) {
+                MBABORT("snprintf error\n");
+            }
+
+            // get dev
+            blkid_get_cache(&cache, NULL);
+            blkid_dev dev = blkid_get_dev(cache, path, BLKID_DEV_NORMAL);
+            if(!dev) {
+                LOGV("Device %s not found\n", path);
+                continue;
+            }
+
+            // get part uuid
+            iter = blkid_tag_iterate_begin(dev);
+            while (blkid_tag_next(iter, &type, &value) == 0) {
+                if(!strcmp(type, "PARTUUID")) {
+                    if(!strcasecmp(value, guid)) {
+                        // we have a match
+
+                        // this assignment works because both we and our parent use the same address
+                        // so while the actual memory is (or may be) different, the address is the same
+                        *result = event;
+                        exit(0);
+                    }
+                }
+            }
+
+            blkid_tag_iterate_end(iter);
         }
 
-        // get part uuid
-        iter = blkid_tag_iterate_begin(dev);
-        while (blkid_tag_next(iter, &type, &value) == 0) {
-            if(!strcmp(type, "PARTUUID") && !strcasecmp(value, guid)) {
-                rc = 1;
-                break;
-            }
-        }
-        blkid_tag_iterate_end(iter);
-        exit(rc);
+        // not found
+        exit(1);
     } else {
         waitpid(pid, &rc, 0);
     }
 
-    return rc;
+    // get result
+    uevent_block_t* ret = NULL;
+    if(rc==0)
+        ret = *result;
+
+    // cleanup
+    munmap(result, sizeof(void*));
+
+    return ret;
 }
 
 int run_init(int trace)
 {
     char *par[2];
     int i = 0, ret = 0;
+
+    // cancel watchdog timer
+    alarm(0);
 
     // build args
     par[i++] = "/init";
@@ -322,6 +363,76 @@ multiboot_partition_t* multiboot_part_by_name(const char* name) {
     return NULL;
 }
 
+static void find_bootdev(int update) {
+    int rc;
+
+    if(update) {
+        // rescan
+        add_new_block_devices(multiboot_data.blockinfo);
+
+        // update devfs
+        rc = uevent_create_nodes(multiboot_data.blockinfo, MBPATH_DEV);
+        if(rc) {
+            MBABORT("Can't build devfs: %s\n", strerror(errno));
+        }
+    }
+
+    multiboot_data.bootdev = get_blockinfo_for_guid(multiboot_data.guid);
+}
+
+static void wait_for_bootdev(void) {
+    struct sockaddr_nl nls;
+    struct pollfd pfd;
+    char buf[512];
+
+    // initialize memory
+    memset(&nls,0,sizeof(struct sockaddr_nl));
+    nls.nl_family = AF_NETLINK;
+    nls.nl_pid = getpid();
+    nls.nl_groups = -1;
+
+    // create socket
+    pfd.events = POLLIN;
+    pfd.fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
+    if (pfd.fd==-1)
+        LOGF("cant create socket: %s\n", strerror(errno));
+
+    // bind to socket
+    if (bind(pfd.fd, (void *)&nls, sizeof(struct sockaddr_nl)))
+        LOGF("can't bind: %s\n", strerror(errno));
+
+    // we do this because the device could have become available between
+    // us searching for the first time and setting up the socket
+    find_bootdev(1);
+    if(multiboot_data.bootdev) {
+        goto close_socket;
+    }
+
+    // poll for changes
+    while (poll(&pfd, 1, -1) != -1) {
+        int len = recv(pfd.fd, buf, sizeof(buf), MSG_DONTWAIT);
+        if (len==-1)  {
+            LOGF("recv error: %s\n", strerror(errno));
+        }
+
+        // we don't check the event type here and just rescan the block devices everytime
+
+        // search for bootdev
+        find_bootdev(1);
+        if(multiboot_data.bootdev) {
+            goto close_socket;
+        }
+        LOGE("Boot device still not found. continue waiting.\n");
+    }
+
+close_socket:
+    close(pfd.fd);
+}
+
+static void alarm_signal(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp) {
+    LOGF("watchdog timeout\n");
+}
+
 int multiboot_main(UNUSED int argc, char** argv) {
     int rc = 0;
     int i;
@@ -332,6 +443,10 @@ int multiboot_main(UNUSED int argc, char** argv) {
 
     // init logging
     log_init();
+
+    // set watchdog timer
+    util_setsighandler(SIGALRM, alarm_signal);
+    alarm(15);
 
     // mount tmpfs to MBPATH_ROOT so we'll be able to write once init mounted rootfs as RO
     SAFE_MOUNT("tmpfs", MBPATH_ROOT, "tmpfs", MS_NOSUID, "mode=0755");
@@ -362,7 +477,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
     LOGD("build dev fs\n");
     rc = uevent_create_nodes(multiboot_data.blockinfo, MBPATH_DEV);
     if(rc) {
-        MBABORT("Can't mount dev: %s\n", strerror(errno));
+        MBABORT("Can't build devfs: %s\n", strerror(errno));
     }
 
     // check for hwname
@@ -454,16 +569,16 @@ int multiboot_main(UNUSED int argc, char** argv) {
 
         // get boot device
         LOGD("search for boot device\n");
-        for(i=0; i<multiboot_data.blockinfo->num_entries; i++) {
-            uevent_block_t *event = &multiboot_data.blockinfo->entries[i];
 
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "/dev/block/%s", event->devname);
-            if(device_matches(buf, multiboot_data.guid)) {
-                multiboot_data.bootdev = event;
-                break;
-            }
+        find_bootdev(0);
+        if(!multiboot_data.bootdev) {
+            LOGE("Boot device not found. waiting for changes.\n");
         }
 
+        // wait until we found it
+        wait_for_bootdev();
+
+        // just to make sure we really found it
         if(!multiboot_data.bootdev) {
             MBABORT("Boot device not found\n");
         }

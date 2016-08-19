@@ -83,7 +83,7 @@ typedef struct {
 
     // device info
     struct fstab *mbfstab;
-    uevent_block_info_t* blockinfo;
+    list_node_t* blockinfo;
     char* hwname;
     struct fstab *romfstab;
     char* romfstabpath;

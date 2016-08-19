@@ -59,7 +59,18 @@ static int getint(const char *s)
     return ret;
 }
 
-static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
+static uevent_block_t *get_blockinfo_by_filename(list_node_t *info, const char *filename)
+{
+    uevent_block_t *event;
+    list_for_every_entry(info, event, uevent_block_t, node) {
+        if(!strcmp(event->filename, filename))
+            return event;
+    }
+
+    return NULL;
+}
+
+static int add_uevent_entry(list_node_t *info, const char *filename)
 {
     FILE *fp;
     char line[128];
@@ -72,9 +83,8 @@ static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
     }
 
     // allocate memory
-    int index = info->num_entries++;
-    info->entries = realloc(info->entries, info->num_entries * sizeof(info->entries[0]));
-    memset(&info->entries[index], 0, sizeof(info->entries[0]));
+    uevent_block_t* entry = safe_calloc(1, sizeof(uevent_block_t));
+    entry->filename = safe_strdup(filename);
 
     // parse file
     while (fgets(line, sizeof(line), fp) != NULL) {
@@ -85,25 +95,26 @@ static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
             continue;
 
         if (!strcmp(name, "MAJOR")) {
-            info->entries[index].major = getint(value);
+            entry->major = getint(value);
         } else if (!strcmp(name, "MINOR")) {
-            info->entries[index].minor = getint(value);
+            entry->minor = getint(value);
         } else if (!strcmp(name, "PARTN")) {
-            info->entries[index].partn = getint(value);
+            entry->partn = getint(value);
         } else if (!strcmp(name, "DEVNAME")) {
-            info->entries[index].devname = safe_strdup(value);
+            entry->devname = safe_strdup(value);
         } else if (!strcmp(name, "PARTNAME")) {
-            info->entries[index].partname = safe_strdup(value);
+            entry->partname = safe_strdup(value);
         } else if (!strcmp(name, "DEVTYPE")) {
             if (!strcmp(value, "disk"))
-                info->entries[index].type = UEVENT_BLOCK_TYPE_DISK;
+                entry->type = UEVENT_BLOCK_TYPE_DISK;
             else if (!strcmp(value, "partition"))
-                info->entries[index].type =
-                    UEVENT_BLOCK_TYPE_PARTITION;
+                entry->type = UEVENT_BLOCK_TYPE_PARTITION;
             else
-                info->entries[index].type = UEVENT_BLOCK_TYPE_UNKNOWN;
+                entry->type = UEVENT_BLOCK_TYPE_UNKNOWN;
         }
     }
+
+    list_add_tail(info, &entry->node);
 
     // close file
     if(fclose(fp)) {
@@ -113,18 +124,16 @@ static int add_uevent_entry(uevent_block_info_t *info, const char *filename)
     return 0;
 }
 
-uevent_block_info_t *get_block_devices(void)
+static int get_block_devices_internal(list_node_t* info, int rescan)
 {
     const char *path = UEVENT_PATH_BLOCK_DEVICES;
     char buf[PATH_MAX];
-    uevent_block_info_t *info = safe_malloc(sizeof(uevent_block_info_t));
-    memset(info, 0, sizeof(info[0]));
 
     DIR *d = opendir(path);
     if (!d) {
         LOGE("Can't open %s: %s\n", path, strerror(errno));
         free(info);
-        return NULL;
+        return -1;
     }
 
     struct dirent *dt;
@@ -132,7 +141,12 @@ uevent_block_info_t *get_block_devices(void)
         if (dt->d_type != DT_LNK)
             continue;
 
-        SAFE_SNPRINTF_RET(LOGE, NULL, buf, ARRAY_SIZE(buf), "%s/%s/uevent", path, dt->d_name);
+        SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "%s/%s/uevent", path, dt->d_name);
+
+        // skip if this is a rescan and the item does already exist
+        if(rescan && get_blockinfo_by_filename(info, buf))
+            continue;
+
         add_uevent_entry(info, buf);
     }
 
@@ -140,15 +154,33 @@ uevent_block_info_t *get_block_devices(void)
         LOGW("Can't close %s: %s\n", path, strerror(errno));
     }
 
+    return 0;
+}
+
+list_node_t *get_block_devices(void)
+{
+    list_node_t *info = safe_malloc(sizeof(list_node_t));
+    list_initialize(info);
+
+    int rc = get_block_devices_internal(info, 0);
+    if(rc) {
+        free(info);
+        return NULL;
+    }
+
     return info;
 }
 
-void free_block_devices(uevent_block_info_t *info)
+void add_new_block_devices(list_node_t* info)
 {
-    int i;
+    get_block_devices_internal(info, 1);
+}
 
-    for (i = 0; i < info->num_entries; i++) {
-        uevent_block_t *event = &info->entries[i];
+void free_block_devices(list_node_t *info)
+{
+    while(!list_is_empty(info)) {
+        uevent_block_t* event = list_peek_tail_type(info, uevent_block_t, node);
+
         if (event->devname)
             free(event->devname);
         if (event->partname)
@@ -159,9 +191,8 @@ void free_block_devices(uevent_block_info_t *info)
     free(info);
 }
 
-uevent_block_t *get_blockinfo_for_path(uevent_block_info_t *info, const char *path)
+uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path)
 {
-    int i;
     char *search_name = NULL;
     bool use_name = false;
     const char* search_devname = NULL;
@@ -186,9 +217,8 @@ uevent_block_t *get_blockinfo_for_path(uevent_block_info_t *info, const char *pa
         search_devname = path + strlen(prefix);
     }
 
-    for (i = 0; i < info->num_entries; i++) {
-        uevent_block_t *event = &info->entries[i];
-
+    uevent_block_t *event;
+    list_for_every_entry(info, event, uevent_block_t, node) {
         if (use_name && event->partname && !strcmp(event->partname, search_name)) {
             ret = event;
             break;
@@ -204,7 +234,7 @@ uevent_block_t *get_blockinfo_for_path(uevent_block_info_t *info, const char *pa
     return ret;
 }
 
-char *uevent_realpath(uevent_block_info_t *info, const char *path, char *resolved_path)
+char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path)
 {
     uevent_block_t *bi = get_blockinfo_for_path(info, path);
     if (!bi)
@@ -215,9 +245,8 @@ char *uevent_realpath(uevent_block_info_t *info, const char *path, char *resolve
     return resolved_path;
 }
 
-int uevent_create_nodes(uevent_block_info_t *info, const char *path)
+int uevent_create_nodes(list_node_t *info, const char *path)
 {
-    int i;
     char buf[PATH_MAX];
     char path_block[PATH_MAX];
     int rc;
@@ -226,31 +255,31 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
     SAFE_SNPRINTF_RET(LOGE, -1, path_block, sizeof(path_block), "%s/block", path);
 
     // create block directory
-    rc = util_mkdir(path_block);
-    if(rc<0) {
-        return rc;
-    }
-
-    // create all block nodes
-    for (i = 0; i < info->num_entries; i++) {
-        uevent_block_t *bi = &info->entries[i];
-
-        // build node path
-        SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/%s", path_block, bi->devname);
-
-        // create node
-        rc = mknod(buf, S_IFBLK | 0600, makedev(bi->major, bi->minor));
+    if(!util_exists(path_block, 1)) {
+        rc = util_mkdir(path_block);
         if(rc<0) {
             return rc;
         }
     }
 
+    // create all block nodes
+    uevent_block_t *bi;
+    list_for_every_entry(info, bi, uevent_block_t, node) {
+        // build node path
+        SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/%s", path_block, bi->devname);
+
+        // create node
+        rc = mknod(buf, S_IFBLK | 0600, makedev(bi->major, bi->minor));
+        if(rc<0 && errno!=EEXIST) {
+            return rc;
+        }
+    }
     // build devzero path
     SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/zero", path);
 
     // create devzero node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 5));
-    if(rc<0) {
+    if(rc<0 && errno!=EEXIST) {
         return rc;
     }
 
@@ -259,7 +288,7 @@ int uevent_create_nodes(uevent_block_info_t *info, const char *path)
 
     // create devnull node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 3));
-    if(rc<0) {
+    if(rc<0 && errno!=EEXIST) {
         return rc;
     }
 
