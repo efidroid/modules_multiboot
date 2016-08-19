@@ -339,8 +339,6 @@ static int mbini_handler(UNUSED void* user, const char* section, const char* nam
         const char* ext = part->path+pathlen-4;
         if(!strcmp(ext, ".img"))
             part->type = MBPART_TYPE_LOOP;
-        else if(!strcmp(ext, ".dyn"))
-            part->type = MBPART_TYPE_DYN;
     }
 
     // inih defines 1 as OK

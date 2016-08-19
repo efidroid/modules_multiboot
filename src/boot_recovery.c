@@ -183,23 +183,7 @@ int boot_recovery(void) {
                 SAFE_UMOUNT(MBPATH_STUB);
             }
 
-            else if(part->type==MBPART_TYPE_DYN || part->type==MBPART_TYPE_LOOP) {
-                if(part->type==MBPART_TYPE_DYN) {
-                    // path to dynfilefs mountpopint
-                    SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynmount:%s", part->name);
-
-                    // mount dynfilefs
-                    rc = util_dynfilefs(partpath, buf, 0);
-                    if(rc) {
-                        MBABORT("can't mount dynfilefs at %s: %d %d\n", buf, rc, errno);
-                    }
-
-                    // path to stub partition backup (in dynfs mountpoint)
-                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), "%s/loop.fs", buf);
-                    free(partpath);
-                    partpath = safe_strdup(buf2);
-                }
-
+            else if(part->type==MBPART_TYPE_LOOP) {
                 // create new node
                 rc = util_make_loop(loopdevice);
                 if(rc) {

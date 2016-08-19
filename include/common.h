@@ -57,7 +57,6 @@ extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
 
 typedef enum {
     MBPART_TYPE_LOOP = 0,
-    MBPART_TYPE_DYN,
     MBPART_TYPE_BIND,
 } multiboot_partition_type_t;
 
