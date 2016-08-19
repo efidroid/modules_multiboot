@@ -23,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <util.h>
 #include <lib/klog.h>
 
 static int klog_fd = -1;
@@ -46,17 +47,20 @@ void klog_init(void)
 
     if (klog_fd >= 0) return; /* Already initialized */
 
-    if (mknod(name, S_IFCHR | 0600, (1 << 8) | 11) == 0) {
-        klog_fd = open(name, O_WRONLY);
-        if (klog_fd < 0)
-                return;
-        fcntl(klog_fd, F_SETFD, FD_CLOEXEC);
-        unlink(name);
-
-        // redirect stdout and stderr to kmsg
-        dup2(klog_fd, 1);
-        dup2(klog_fd, 2);
+    if(mknod(name, S_IFCHR | 0600, (1 << 8) | 11) != 0) {
+        name = "/dev/kmsg";
+        if(!util_exists(name, 1)) return;
     }
+
+    klog_fd = open(name, O_WRONLY);
+    if (klog_fd < 0)
+            return;
+    fcntl(klog_fd, F_SETFD, FD_CLOEXEC);
+    unlink(name);
+
+    // redirect stdout and stderr to kmsg
+    dup2(klog_fd, 1);
+    dup2(klog_fd, 2);
 }
 
 #define LOG_BUF_MAX 512
