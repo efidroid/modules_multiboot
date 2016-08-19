@@ -60,39 +60,48 @@ int trigger_postfsdata_main(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    if(!strcmp(argv[0], "trigger-postfs-data")) {
+    // get program name
+    char* progname = util_basename(argv[0]);
+    if(!progname) {
+        fprintf(stderr, "can't get basename of main executable\n");
+        return 1;
+    }
+
+    if(!strcmp(progname, "init.multiboot")) {
+        if(argc>=2) {
+            if(!strcmp(argv[1], "trigger-postfs-data")) {
+                return trigger_postfsdata_main(argc-1, argv+1);
+            }
+            else if(!strcmp(argv[1], "mke2fs")) {
+                return mke2fs_main(argc-1, argv+1);
+            }
+            else if(!strcmp(argv[1], "busybox")) {
+                return busybox_main(argc-1, argv+1);
+            }
+            else if(!strcmp(argv[1], "dynfilefs")) {
+                log_init();
+                return dynfilefs_main(argc-1, argv+1);
+            }
+        }
+        else {
+            multiboot_main(argc, argv);
+            MBABORT("multiboot_main returned\n");
+        }
+    }
+    else if(!strcmp(progname, "trigger-postfs-data")) {
         return trigger_postfsdata_main(argc, argv);
     }
-    else if(!strcmp(argv[0], "mke2fs")) {
+    else if(!strcmp(progname, "mke2fs")) {
         return mke2fs_main(argc, argv);
     }
-    else if(!strcmp(argv[0], "busybox")) {
+    else if(!strcmp(progname, "busybox")) {
         return busybox_main(argc, argv);
     }
-    else if(!strcmp(argv[0], "dynfilefs")) {
+    else if(!strcmp(progname, "dynfilefs")) {
         return dynfilefs_main(argc, argv);
     }
 
-    else if(argc>=2) {
-        if(!strcmp(argv[1], "trigger-postfs-data")) {
-            return trigger_postfsdata_main(argc-1, argv+1);
-        }
-        else if(!strcmp(argv[1], "mke2fs")) {
-            return mke2fs_main(argc-1, argv+1);
-        }
-        else if(!strcmp(argv[1], "busybox")) {
-            return busybox_main(argc-1, argv+1);
-        }
-        else if(!strcmp(argv[1], "dynfilefs")) {
-            log_init();
-            return dynfilefs_main(argc-1, argv+1);
-        }
-    }
+    fprintf(stderr, "invalid arguments\n");
 
-    int rc = multiboot_main(argc, argv);
-    if(rc) {
-        MBABORT("multiboot_main returned: %s\n", strerror(-rc));
-    }
-
-    return 0;
+    return 1;
 }
