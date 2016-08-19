@@ -189,7 +189,6 @@ int boot_recovery(void) {
                     SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynmount:%s", part->name);
 
                     // mount dynfilefs
-                    unlink(partpath);
                     rc = util_dynfilefs(partpath, buf, 1*1024*1024*1024);
                     if(rc) {
                         MBABORT("can't mount dynfilefs at %s: %d %d\n", buf, rc, errno);
