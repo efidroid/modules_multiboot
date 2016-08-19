@@ -244,7 +244,6 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
     char kname[PATH_MAX];
     char buf[PATH_MAX];
     int rc;
-    part_replacement_t *replacement = NULL;
 
     if(!syshook_multiboot_data->is_multiboot)
         goto continue_syscall;
@@ -253,40 +252,22 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
     kname[0] = 0;
     syshook_strncpy_user(process, kname, name, sizeof(kname));
 
-    // get lindev
-    unsigned major = 0, minor = 0;
-    rc = lindev_from_mountpoint(kname, &major, &minor);
-    if(rc) {
-        goto continue_syscall;
-    }
-
-    // get replacement
-    replacement = syshook_get_replacement(major, minor);
-    if(!replacement) {
-        goto continue_syscall;
-    }
-
     // unmount datamedia
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND && !strcmp(replacement->u.multiboot.part->name, "data")) {
+    if(!strcmp(kname, "/data")) {
         // scan mounted volumes
         rc = scan_mounted_volumes();
         if(rc) {
             MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
         }
 
-        if(!strcmp(kname, "/data")) {
-            // build target dir path
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kname);
+        // build target dir path
+        SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kname);
 
-            // check if datamedia is mounted at this path
-            const mounted_volume_t* volume = find_mounted_volume_by_mount_point(buf);
-            if(volume) {
-                LOGV("unmount datamedia for %s\n", kname);
-                SAFE_UMOUNT(buf);
-                if(rc) {
-                    MBABORT("Can't unmount datamedia for %s\n", kname);
-                }
-            }
+        // check if datamedia is mounted at this path
+        const mounted_volume_t* volume = find_mounted_volume_by_mount_point(buf);
+        if(volume) {
+            LOGV("unmount datamedia for %s\n", kname);
+            SAFE_UMOUNT(buf);
         }
     }
 
