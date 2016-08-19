@@ -47,8 +47,8 @@ __END_DECLS
 #define LOGI_LEVEL 4
 #define LOGW_LEVEL 5
 #define LOGE_LEVEL 6
-#define LOGA_LEVEL 7
-#define LOGF_LEVEL 8
+#define LOGF_LEVEL 7
+#define LOGS_LEVEL 8
 
 #define LOG_INTERNAL(level, levelprefix, fmt, ...) \
     log_write(level, levelprefix "/" LOG_TAG "(%d:%d): " fmt, getpid(), (pid_t)syscall(SYS_gettid), ##__VA_ARGS__)
@@ -58,7 +58,6 @@ __END_DECLS
 #define LOGI(fmt, ...) LOG_INTERNAL(LOGI_LEVEL, "I", fmt, ##__VA_ARGS__)
 #define LOGW(fmt, ...) LOG_INTERNAL(LOGW_LEVEL, "W", fmt, ##__VA_ARGS__)
 #define LOGE(fmt, ...) LOG_INTERNAL(LOGE_LEVEL, "E", fmt, ##__VA_ARGS__)
-#define LOGA(fmt, ...) LOG_INTERNAL(LOGA_LEVEL, "A", fmt, ##__VA_ARGS__)
 #define LOGF(fmt, ...) do {\
     efivars_set_error(fmt, ##__VA_ARGS__); \
     LOG_INTERNAL(LOGF_LEVEL, "F", fmt, ##__VA_ARGS__); \

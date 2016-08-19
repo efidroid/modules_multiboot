@@ -67,7 +67,7 @@ void log_write(int level, const char *fmt, ...)
     log_vwrite(level, fmt, ap);
     va_end(ap);
 
-    if(level>=LOGF_LEVEL) {
+    if(level==LOGF_LEVEL) {
         // try to reboot
         android_reboot(ANDROID_RB_RESTART, 0, 0);
 
