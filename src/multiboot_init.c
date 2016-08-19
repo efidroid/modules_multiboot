@@ -55,23 +55,22 @@ static void import_kernel_nv(char *name)
         return;
 
     if (!strcmp(name, "multibootpath")) {
-        char type[4];
         char guid[37];
         char *path = NULL;
 
         // check type
         const char* format = NULL;
         if(!strncmp(value, "GPT", 3))
-            format = "%3s,%36s,%ms";
+            format = "GPT,%36s,%ms";
         else if(!strncmp(value, "MBR", 3))
-            format = "%3s,%11s,%ms";
+            format = "MBR,%11s,%ms";
         else {
             MBABORT("invalid multibootpath: %s\n", value);
             return;
         }
 
         // read values
-        if ((rc=sscanf(value, format, type, guid, &path)) != 3) {
+        if ((rc=sscanf(value, format, guid, &path)) != 2) {
             MBABORT("invalid multibootpath: %s\n", value);
             return;
         }
