@@ -27,6 +27,8 @@
 #define LOG_TAG "MAIN"
 #include <lib/log.h>
 
+#include <lib/dynfilefs.h>
+
 static volatile sig_atomic_t usr_interrupt = 0;
 static void synch_signal(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp) {
     // stop waiting for signals
@@ -67,6 +69,9 @@ int main(int argc, char** argv) {
     else if(!strcmp(argv[0], "busybox")) {
         return busybox_main(argc, argv);
     }
+    else if(!strcmp(argv[0], "dynfilefs")) {
+        return dynfilefs_main(argc, argv);
+    }
 
     else if(argc>=2) {
         if(!strcmp(argv[1], "trigger-postfs-data")) {
@@ -77,6 +82,10 @@ int main(int argc, char** argv) {
         }
         else if(!strcmp(argv[1], "busybox")) {
             return busybox_main(argc-1, argv+1);
+        }
+        else if(!strcmp(argv[1], "dynfilefs")) {
+            log_init();
+            return dynfilefs_main(argc-1, argv+1);
         }
     }
 
