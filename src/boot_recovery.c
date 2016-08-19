@@ -28,7 +28,6 @@
 #include <lib/fs_mgr.h>
 #include <lib/uevent.h>
 #include <lib/mounts.h>
-#include <lib/dynfilefs.h>
 
 #include <common.h>
 #include <util.h>
@@ -141,7 +140,7 @@ int boot_recovery(void) {
                 SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
 
                 // mount dynfilefs
-                rc = dynfilefs_mount(buf, num_blocks, buf2);
+                rc = util_dynfilefs(buf, buf2, num_blocks*512llu);
                 if(rc) {
                     MBABORT("can't mount dynfilefs\n");
                 }
@@ -184,11 +183,22 @@ int boot_recovery(void) {
                 SAFE_UMOUNT(MBPATH_STUB);
             }
 
-            else {
-                // create partition image
-                rc = util_create_partition_backup(device, partpath);
-                if(rc) {
-                    MBABORT("Can't create file '%s'\n", partpath);
+            else if(part->type==MBPART_TYPE_DYN || part->type==MBPART_TYPE_LOOP) {
+                if(part->type==MBPART_TYPE_DYN) {
+                    // path to dynfilefs mountpopint
+                    SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynmount:%s", part->name);
+
+                    // mount dynfilefs
+                    unlink(partpath);
+                    rc = util_dynfilefs(partpath, buf, 1*1024*1024*1024);
+                    if(rc) {
+                        MBABORT("can't mount dynfilefs at %s: %d %d\n", buf, rc, errno);
+                    }
+
+                    // path to stub partition backup (in dynfs mountpoint)
+                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), "%s/loop.fs", buf);
+                    free(partpath);
+                    partpath = safe_strdup(buf2);
                 }
 
                 // create new node
@@ -202,6 +212,10 @@ int boot_recovery(void) {
                 if(rc) {
                     MBABORT("Can't setup loop device at %s for %s\n", loopdevice, partpath);
                 }
+            }
+
+            else {
+                LOGF("invalid partition type: %d\n", part->type);
             }
 
             part_replacement_t* pdata = safe_calloc(sizeof(part_replacement_t), 1);

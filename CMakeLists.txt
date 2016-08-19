@@ -53,14 +53,6 @@ set_target_properties(sepolicy-inject PROPERTIES
   COMPILE_FLAGS "-pipe -fno-strict-aliasing"
 )
 
-# dynfilefs
-add_library(dynfilefs STATIC
-    lib/dynfilefs/dynfilefs.c
-)
-set_target_properties(dynfilefs PROPERTIES
-    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64"
-)
-
 # main
 add_executable(init
     # main code

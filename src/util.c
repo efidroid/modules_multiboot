@@ -29,6 +29,7 @@
 
 #include <lib/klog.h>
 #include <lib/fs_mgr.h>
+#include <lib/dynfilefs.h>
 #include <blkid/blkid.h>
 
 #include <common.h>
@@ -676,4 +677,53 @@ void util_mount_esp(void) {
             MBABORT("Can't mount ESP: %s\n", strerror(errno));
         }
     }
+}
+
+int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
+{
+    char *par[64];
+    int i = 0;
+    int rc;
+
+    // create mountpoint directory
+    rc = util_mkdir(_target);
+    if(rc) {
+        LOGE("Can't create directory at %s\n", _target);
+        return -1;
+    }
+
+    // duplicate arguments
+    char* source = safe_strdup(_source);
+    char* target = safe_strdup(_target);
+
+    // build size
+    char* ssize = safe_malloc(PATH_MAX);
+    SAFE_SNPRINTF_RET(LOGE, -1, ssize, PATH_MAX, "-s%llu", size);
+
+    // tool
+    par[i++] = "dynfilefs";
+
+    par[i++] = "-o";
+    par[i++] = "direct_io,kernel_cache";
+
+    // size
+    par[i++] = ssize;
+
+    // source
+    par[i++] = source;
+
+    // target
+    par[i++] = target;
+
+    // end
+    par[i++] = (char *)0;
+
+    rc = util_exec_main(i-1, par, dynfilefs_main);
+
+    // free arguments
+    free(ssize);
+    free(target);
+    free(source);
+
+    return rc;
 }
