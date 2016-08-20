@@ -287,9 +287,16 @@ int boot_android(void) {
         }
 
         // write entries
+        int processed_data = 0;
         for(i=0; i<multiboot_data->romfstab->num_entries; i++) {
             struct fstab_rec *rec;
             rec = &multiboot_data->romfstab->recs[i];
+            int is_data = !strcmp(rec->mount_point, "/data");
+
+            // this is a workaround for /data having two entries: for ext4 and f2fs
+            // while double-mounting it doesn't seem to break sth. it doesn't looks good either
+            if(is_data && processed_data)
+                continue;
 
             // get multiboot part
             // TODO: use blkdevice
@@ -327,7 +334,7 @@ int boot_android(void) {
                 fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
 
                 // bind mount datamedia
-                if(part->type==MBPART_TYPE_BIND && !strcmp(rec->mount_point, "/data")) {
+                if(part->type==MBPART_TYPE_BIND && is_data) {
                     // create /media on the main data partition
                     if(!util_exists(MBPATH_DATA"/media", false)) {
                         rc = util_mkdir(MBPATH_DATA"/media");
@@ -347,6 +354,9 @@ int boot_android(void) {
 
                     fstab_append(fd, MBPATH_DATA"/media", "/data/media", rec->fs_type, "bind", "defaults");
                 }
+
+                if(is_data)
+                    processed_data = 1;
             }
 
             else {
