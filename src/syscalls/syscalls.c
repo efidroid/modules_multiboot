@@ -66,6 +66,7 @@ SYSCALL_DEFINE3(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNUSED mode_t, mode)
 {
     int rc;
+    long ret;
     char kfilename[PATH_MAX];
     char abspath[PATH_MAX*2 + 1];
     long scno = syshook_syscall_get(process);
@@ -91,13 +92,13 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     unsigned major = 0, minor = 0;
     rc = lindev_from_path(abspath, &major, &minor, 1);
     if(rc) {
-        return syshook_invoke_hookee(process);
+        goto run_syscall;
     }
 
     // get replacement
     replacement = syshook_get_replacement(major, minor);
     if(!replacement) {
-        return syshook_invoke_hookee(process);
+        goto run_syscall;
     }
 
     // copy loopdevice to child
@@ -110,7 +111,8 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     // use loop device
     syshook_argument_set(process, scno==SYS_openat?1:0, (long)uabspath);
 
-    long ret = syshook_invoke_hookee(process);
+run_syscall:
+    ret = syshook_invoke_hookee(process);
     if(ret>=0) {
         fdinfo_add(process, ret, abspath, flags, major, minor);
     }
