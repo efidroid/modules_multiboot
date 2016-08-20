@@ -195,6 +195,26 @@ static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void
             MBABORT("Can't write\n"); \
         }
 
+static int fstab_append(int fd, const char* blk_device, const char* mount_point, const char* fs_type, const char* mnt_flags, const char* fs_mgr_flags) {
+    size_t bytes_written;
+    size_t len;
+
+    // allocate line buffer
+    size_t linelen = strlen(blk_device) + strlen(mount_point) + strlen(fs_type) + strlen(mnt_flags) + strlen(fs_mgr_flags) + 6;
+    char* line = safe_malloc(linelen);
+
+    // build line
+    SAFE_SNPRINTF_RET(MBABORT, -1, line, linelen, "%s %s %s %s %s\n", blk_device, mount_point, fs_type, mnt_flags, fs_mgr_flags);
+
+    // write line
+    CHECK_WRITE(fd, line);
+
+    // free line
+    free(line);
+
+    return 0;
+}
+
 int boot_android(void) {
     multiboot_data = multiboot_get_data();
 
@@ -254,9 +274,6 @@ int boot_android(void) {
 
     // boot multiboot system
     else {
-        size_t bytes_written;
-        size_t len;
-
         // get directory of multiboot.ini
         char* basedir = util_dirname(multiboot_data->path);
         if(!basedir) {
@@ -274,13 +291,13 @@ int boot_android(void) {
             struct fstab_rec *rec;
             rec = &multiboot_data->romfstab->recs[i];
 
-            const char* blk_device = rec->blk_device;
-            const char* mnt_flags = rec->mnt_flags_orig;
-
             // get multiboot part
             // TODO: use blkdevice
             multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
             if(part) {
+                const char* blk_device;
+                const char* mnt_flags = rec->mnt_flags_orig;
+
                 // build path
                 SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
 
@@ -306,20 +323,14 @@ int boot_android(void) {
 
                     blk_device = buf2;
                 }
+
+                fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
             }
 
-            // allocate line buffer
-            size_t linelen = strlen(blk_device) + strlen(rec->mount_point) + strlen(rec->fs_type) + strlen(mnt_flags) + strlen(rec->fs_mgr_flags_orig) + 6;
-            char* line = safe_malloc(linelen);
-
-            // build line
-            SAFE_SNPRINTF_RET(MBABORT, -1, line, linelen, "%s %s %s %s %s\n", blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
-
-            // write line
-            CHECK_WRITE(fd, line);
-
-            // free line
-            free(line);
+            else {
+                // write unmodified entry
+                fstab_append(fd, rec->blk_device, rec->mount_point, rec->fs_type, rec->mnt_flags_orig, rec->fs_mgr_flags_orig);
+            }
         }
 
         // close file
