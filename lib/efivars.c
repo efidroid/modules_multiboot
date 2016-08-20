@@ -50,7 +50,7 @@
         sizeof(uint32_t) + /* datasize */ \
         ALIGN(datasize, sizeof(uint32_t))) /* data */
 
-#define EFIVARDEV "/multiboot/efivardev"
+#define EFIVARDEV MBPATH_DEV "/efivardev"
 
 typedef struct {
     uint32_t magic;
@@ -96,9 +96,6 @@ static int copy_ansi2unicodestr(uint16_t** outdst, const char* src, size_t* outs
 }
 
 static char* efivar_getdev(void) {
-    char buf[PATH_MAX];
-    int rc;
-
     // check if blockinfo is available
     multiboot_data_t* mbdata = multiboot_get_data();
     if(!mbdata || !mbdata->blockinfo) goto err;
@@ -106,12 +103,6 @@ static char* efivar_getdev(void) {
     // get block of our partition
     uevent_block_t* bi = get_blockinfo_for_path(mbdata->blockinfo, DEVICE_NVVARS_PARTITION);
     if(!bi) goto err;
-
-    // try /dev/block
-    rc = snprintf(buf, PATH_MAX, "/dev/block/%s", bi->devname);
-    if(rc>=0 && rc<PATH_MAX && util_exists(buf, true)) {
-        return strdup(buf);
-    }
 
     // try EFIVARDEV
     if(util_exists(EFIVARDEV, true)) {
