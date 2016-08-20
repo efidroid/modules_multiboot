@@ -250,6 +250,15 @@ static int selinux_fixup(void) {
     util_sepolicy_inject("init", "tmpfs", "blk_file", "getattr");
     util_sepolicy_inject("init", "tmpfs", "blk_file", "relabelfrom");
 
+    if(multiboot_data.is_multiboot) {
+        // the loop images are not labeled
+        util_sepolicy_inject("kernel", "unlabeled", "file", "read");
+
+        // this is for the datamedia bind-mount
+        util_sepolicy_inject("init", "media_rw_data_file", "dir", "mounton");
+        util_sepolicy_inject("init", "block_device", "lnk_file", "setattr");
+    }
+
     // give our files selinux contexts
     util_append_string_to_file("/file_contexts", "\n\n"
                                "/multiboot(/.*)?               u:object_r:rootfs:s0\n"
