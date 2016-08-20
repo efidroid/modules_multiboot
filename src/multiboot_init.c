@@ -236,7 +236,7 @@ static int selinux_fixup(void) {
     util_sepolicy_inject("kernel", "block_device", "blk_file", "create");
     util_sepolicy_inject("kernel", "device", "dir", "write,add_name");
     util_sepolicy_inject("kernel", "device", "blk_file", "create");
-    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "getattr");
+    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "getattr,search");
     util_sepolicy_inject("kernel", "media_rw_data_file", "file", "getattr,read,write,open");
     util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
 
