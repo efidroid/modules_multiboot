@@ -253,6 +253,13 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     int rc;
     const char* mountpoint = NULL;
 
+    if(replacement) {
+        LOGI("%s got formatted. syncing ESP replacement\n", replacement->loopdevice);
+    }
+    else {
+        LOGI("ESP dev got closed. syncing ALL ESP replacements\n");
+    }
+
     // scan mounted volumes
     rc = scan_mounted_volumes();
     if(rc) {
@@ -278,16 +285,50 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         MBABORT("Can't get ESP directory: %s\n", strerror(errno));
     }
 
-    // get ESP filename
-    char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
-    if(!espfilename) {
-        MBABORT("Can't get filename\n");
-    }
+    if(replacement) {
+        // get ESP filename
+        char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
+        if(!espfilename) {
+            MBABORT("Can't get filename\n");
+        }
 
-    // copy loop to esp
-    rc = util_dd(replacement->loopdevice, espfilename, 0);
-    if(rc) {
-        MBABORT("Can't create partition image\n");
+        // copy loop to esp
+        rc = util_dd(replacement->loopdevice, espfilename, 0);
+        if(rc) {
+            MBABORT("Can't create partition image\n");
+        }
+
+        free(espfilename);
+    }
+    else {
+        if(!util_exists(espdir, false)) {
+            rc = util_mkdir(espdir);
+            if(rc) {
+                MBABORT("Can't create directory at %s\n", espdir);
+            }
+        }
+
+        list_for_every_entry(&syshook_multiboot_data->replacements, replacement, part_replacement_t, node) {
+            pthread_mutex_lock(&replacement->lock);
+
+            // get ESP filename
+            char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
+            if(!espfilename) {
+                MBABORT("Can't get filename\n");
+            }
+
+            // copy loop to esp
+            if(!util_exists(espfilename, false)) {
+                rc = util_dd(replacement->loopdevice, espfilename, 0);
+                if(rc) {
+                    MBABORT("Can't create partition image\n");
+                }
+            }
+
+            free(espfilename);
+
+            pthread_mutex_unlock(&replacement->lock);
+        }
     }
 
     if(!volume) {
@@ -296,7 +337,6 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     }
 
     // cleanup
-    free(espfilename);
     free(espdir);
 
     return 0;
@@ -345,6 +385,11 @@ int syshook_handle_fd_close(fdinfo_t* fdinfo) {
     // ignore if this was readonly
     if(!(fdinfo->flags & (O_WRONLY|O_RDWR))) {
         return 0;
+    }
+
+    // check if this was the ESP
+    if(fdinfo->major==syshook_multiboot_data->espdev->major && fdinfo->minor==syshook_multiboot_data->espdev->minor) {
+        return syshookutil_handle_close_native(NULL);
     }
 
     // get replacement
