@@ -325,6 +325,28 @@ int boot_android(void) {
                 }
 
                 fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
+
+                // bind mount datamedia
+                if(part->type==MBPART_TYPE_BIND && !strcmp(rec->mount_point, "/data")) {
+                    // create /media on the main data partition
+                    if(!util_exists(MBPATH_DATA"/media", false)) {
+                        rc = util_mkdir(MBPATH_DATA"/media");
+                        if(rc) {
+                            MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
+                        }
+                    }
+
+                    // create /media on the ROM's data partition
+                    SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"/%s/%s", basedir, part->path);
+                    if(!util_exists(buf, false)) {
+                        rc = util_mkdir(buf);
+                        if(rc) {
+                            MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
+                        }
+                    }
+
+                    fstab_append(fd, MBPATH_DATA"/media", "/data/media", rec->fs_type, "bind", "defaults");
+                }
             }
 
             else {
