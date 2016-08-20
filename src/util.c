@@ -31,6 +31,7 @@
 #include <lib/fs_mgr.h>
 #include <lib/dynfilefs.h>
 #include <blkid/blkid.h>
+#include <sepolicy_inject.h>
 
 #include <common.h>
 #include <util.h>
@@ -187,34 +188,8 @@ int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
     return status;
 }
 
-static int util_sepolicy_inject_internal(const char** args) {
-    int argc = 0;
-    const char** argptr = args;
-    int i;
-
-    while(*argptr++)
-        argc++;
-
-    char** seargs = safe_malloc(sizeof(char*)*argc+1);
-    seargs[0] = safe_strdup("sepolicy_inject");
-    for(i=0; i<argc; i++) {
-        seargs[i+1] = safe_strdup(args[i]);
-        if(!seargs[i+1]) return -ENOMEM;
-    }
-
-    int rc = sepolicy_inject_main(argc+1, seargs);
-
-    for(i=0; i<argc+1; i++) {
-        free(seargs[i]);
-    }
-    free(seargs);
-
-    return rc;
-}
-
 int util_sepolicy_inject(const char* source, const char* target, const char* clazz, const char* perm) {
-    const char* seargs[] = {"-s", source, "-t", target, "-c", clazz, "-p", perm, "-P", "/sepolicy", "-o", "/sepolicy", NULL};
-    return util_sepolicy_inject_internal(seargs);
+    return sepolicy_inject_rule(source, target, clazz, perm, "/sepolicy", NULL);
 }
 
 int util_append_string_to_file(const char* filename, const char* str) {

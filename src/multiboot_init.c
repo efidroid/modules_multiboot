@@ -212,82 +212,52 @@ static int selinux_fixup(void) {
 
     // we ignore errors on purpose here because selinux might not be needed or supported by the system
 
-    // these two are a side effect of running /init with execve
-    // { execmem } for  uid=0 pid=160 comm="init" scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=process
-    util_sepolicy_inject("init", "init", "process", "execmem");
-    // { execute } for  uid=0 pid=166 comm="e2fsck" path="/dev/__properties__" dev="tmpfs" ino=5017 scontext=u:r:init:s0 tcontext=u:object_r:properties_device:s0 tclass=file
-    util_sepolicy_inject("init", "properties_device", "file", "execute");
+    // don't apply patches in recovery mode
+    if(util_exists("/sbin/recovery", true))
+        return 0;
 
-    // Android M needs these to run /init
-    // { execute } for  uid=0 pid=1 comm="init" path="/file_contexts" dev="rootfs" ino=4541 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
-    // { execute } for  uid=0 pid=1 comm="init" name="init" dev="rootfs" ino=4543 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
+    util_sepolicy_inject("init_multiboot", "rootfs", "filesystem", "associate");
+    util_sepolicy_inject("init", "init_multiboot", "file", "relabelto,getattr,execute,read,execute_no_trans,open");
     util_sepolicy_inject("kernel", "rootfs", "file", "execute");
+    util_sepolicy_inject("rootfs", "tmpfs", "filesystem", "associate");
 
-    // for sending SIGUSR1 from trigger-postfs to init.multiboot
-    // { signal } for  uid=0 pid=209 comm="trigger-postfs-" scontext=u:r:init:s0 tcontext=u:r:kernel:s0 tclass=process
+    // let init run postfs trigger
+    util_sepolicy_inject("init", "init", "process", "execmem");
     util_sepolicy_inject("init", "kernel", "process", "signal");
-    // for sending SIGUSR1 from init.multiboot to trigger-postfs
-    // { signal } for  uid=0 pid=156 comm="init.multiboot" scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=process
-    util_sepolicy_inject("kernel", "init", "process", "signal");
-    // for creating POSTFS_NOTIFICATION_FILE
-    // { write } for  uid=0 pid=156 comm="init.multiboot" path=2F6465762F5F5F6B6D73675F5F202864656C6574656429 dev="rootfs" ino=5004 scontext=u:r:kernel:s0 tcontext=u:object_r:rootfs:s0 tclass=chr_file
-    util_sepolicy_inject("kernel", "rootfs", "chr_file", "write");
-    // Android M
-    // { execute_no_trans } for uid=0 pid=188 comm="init" path="/init.multiboot" dev="rootfs" ino=4575 scontext=u:r:init:s0 tcontext=u:object_r:rootfs:s0 tclass=file permissive=0
-    util_sepolicy_inject("init", "rootfs", "file", "execute_no_trans");
-    // { search } for uid=0 pid=153 comm="init.multiboot" name="1" dev="proc" ino=5311 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=dir permissive=0
-    util_sepolicy_inject("kernel", "init", "dir", "search");
-    // { read } for uid=0 pid=153 comm="init.multiboot" name="mountinfo" dev="proc" ino=6119 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=file permissive=0
-    // { open } for uid=0 pid=152 comm="init.multiboot" name="mountinfo" dev="proc" ino=7086 scontext=u:r:kernel:s0 tcontext=u:r:init:s0 tclass=file permissive=0
-    util_sepolicy_inject("kernel", "init", "file", "read,open");
-    // { search } for uid=0 pid=153 comm="init.multiboot" name="media" dev="mmcblk0p36" ino=106 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=0
-    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/data/media" dev="mmcblk0p36" ino=106 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=0
-    // { write } for uid=0 pid=209 comm="busybox" name="UEFIESP" dev="mmcblk0p36" ino=38022 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=dir permissive=1
-    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "search,getattr,write");
-    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/dev/block/mmcblk0p32" dev="tmpfs" ino=6864 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
-    // { read } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=7050 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
-    // { ioctl } for uid=0 pid=151 comm="init.multiboot" path="/dev/block/mmcblk0p32" dev="tmpfs" ino=6424 ioctlcmd=1260 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=1
-    // { open } for uid=0 pid=153 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6182 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
-    // { unlink } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6322 scontext=u:r:kernel:s0 tcontext=u:object_r:recovery_block_device:s0 tclass=blk_file permissive=0
-    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,ioctl,open,unlink");
-    // { write } for uid=0 pid=151 comm="init.multiboot" name="block" dev="tmpfs" ino=6217 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
-    // { remove_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" dev="tmpfs" ino=6424 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
-    // { add_name } for uid=0 pid=151 comm="init.multiboot" name="mmcblk0p32" scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=dir permissive=1
-    util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
-    // { create } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
-    // { write open } for uid=0 pid=209 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
-    // { read } for uid=0 pid=210 comm="busybox" name="partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=1
-    // { getattr } for uid=0 pid=152 comm="init.multiboot" path="/data/media/UEFIESP/partition_recovery.img" dev="mmcblk0p36" ino=55728 scontext=u:r:kernel:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=0
-    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "create,write,read,open,getattr");
-    // { ioctl } for uid=0 pid=152 comm="init.multiboot" path="/dev/block/mmcblk0p31" dev="tmpfs" ino=6412 ioctlcmd=1260 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
-    // { read } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6412 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
-    // { open } for uid=0 pid=152 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6412 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=1
-    // { getattr } for uid=0 pid=153 comm="init.multiboot" path="/dev/block/mmcblk0p31" dev="tmpfs" ino=6705 scontext=u:r:kernel:s0 tcontext=u:object_r:boot_block_device:s0 tclass=blk_file permissive=0
-    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "ioctl,read,open,getattr");
 
-    // the following rules are needed for setting up UEFI partition replacements
-    // { execute } for  uid=0 pid=210 comm="init.multiboot" name="busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
-    // { execute_no_trans } for  uid=0 pid=210 comm="init.multiboot" path="/multiboot/bin/busybox" dev="tmpfs" ino=4985 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file
-    // { open } for uid=0 pid=209 comm="init.multiboot" name="busybox" dev="tmpfs" ino=5507 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=file permissive=1
-    util_sepolicy_inject("kernel", "tmpfs", "file", "execute,execute_no_trans,open");
-    // { execmem } for  uid=0 pid=210 comm="busybox" scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
-    util_sepolicy_inject("kernel", "kernel", "process", "execmem");
-    // { unlink } for  uid=0 pid=157 comm="init.multiboot" name="mmcblk0p31" dev="tmpfs" ino=6980 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
-    util_sepolicy_inject("kernel", "block_device", "blk_file", "unlink");
-    // { mknod } for  uid=0 pid=157 comm="init.multiboot" capability=27  scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=capability
+    // let init.multiboot do it's postfs work
     util_sepolicy_inject("kernel", "kernel", "capability", "mknod");
-    // { create } for  uid=0 pid=157 comm="init.multiboot" name="mmcblk0p31" scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
-    // { write } for  uid=0 pid=211 comm="busybox" name="mmcblk0p31" dev="tmpfs" ino=7264 scontext=u:r:kernel:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file
-    util_sepolicy_inject("kernel", "block_device", "blk_file", "create,write");
-    // { write } for uid=0 pid=152 comm="init.multiboot" name="/" dev="tmpfs" ino=5328 scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=dir permissive=0
-    util_sepolicy_inject("kernel", "tmpfs", "dir", "write");
-    // { create } for uid=0 pid=153 comm="init.multiboot" name="replacement_backup_boot" scontext=u:r:kernel:s0 tcontext=u:object_r:tmpfs:s0 tclass=blk_file permissive=0
-    util_sepolicy_inject("kernel", "tmpfs", "blk_file", "create");
+    util_sepolicy_inject("kernel", "rootfs", "chr_file", "write");
+    util_sepolicy_inject("kernel", "init", "dir", "search");
+    util_sepolicy_inject("kernel", "init", "file", "read,open");
+    util_sepolicy_inject("kernel", "init", "process", "signal");
+    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+    util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
+    util_sepolicy_inject("kernel", "block_device", "blk_file", "create");
+    util_sepolicy_inject("kernel", "device", "dir", "write,add_name");
+    util_sepolicy_inject("kernel", "device", "blk_file", "create");
+    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "getattr");
+    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "getattr,read,write,open");
+    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
 
-    // give our files some selinux context
+    // for our restorecon injections
+    util_sepolicy_inject("init", "rootfs", "dir", "relabelto");
+    util_sepolicy_inject("init", "tmpfs", "chr_file", "relabelfrom");
+    util_sepolicy_inject("init", "null_device", "chr_file", "relabelto");
+    util_sepolicy_inject("init", "zero_device", "chr_file", "relabelto");
+    util_sepolicy_inject("init", "block_device", "blk_file", "relabelto");
+    util_sepolicy_inject("init", "block_device", "dir", "relabelto");
+    util_sepolicy_inject("init", "tmpfs", "blk_file", "getattr");
+    util_sepolicy_inject("init", "tmpfs", "blk_file", "relabelfrom");
+
+    // give our files selinux contexts
     util_append_string_to_file("/file_contexts", "\n\n"
-                               "/multiboot(/.*)?             u:object_r:rootfs:s0\n"
-                               "/multiboot/bin(/.*)?         u:object_r:rootfs:s0\n"
+                               "/multiboot(/.*)?               u:object_r:rootfs:s0\n"
+                               "/multiboot/dev(/.*)?           u:object_r:device:s0\n"
+                               "/multiboot/dev/null            u:object_r:null_device:s0\n"
+                               "/multiboot/dev/zero            u:object_r:zero_device:s0\n"
+                               "/multiboot/dev/block(/.*)?     u:object_r:block_device:s0\n"
+                               "/init\\.multiboot              u:object_r:init_multiboot:s0\n"
 
                                // prevent restorecon_recursive on multiboot directories
                                "/data/media/multiboot(/.*)?          <<none>>\n"
@@ -295,6 +265,15 @@ static int selinux_fixup(void) {
                                "/realdata/media/multiboot(/.*)?      <<none>>\n"
                                "/realdata/media/0/multiboot(/.*)?    <<none>>\n"
                               );
+
+    // we need to manually restore these contexts
+    util_append_string_to_file("/init.rc", "\n\n"
+                               "on early-init\n"
+                               "    restorecon /init.multiboot\n"
+                               "    restorecon /multiboot\n"
+                               "    restorecon_recursive /multiboot/dev\n"
+                               "\n"
+                               );
 
     return rc;
 }
@@ -556,10 +535,6 @@ int multiboot_main(UNUSED int argc, char** argv) {
         MBABORT("can't get blockinfo for ESP\n");
     }
 
-    // grant ourselves some selinux permissions :)
-    LOGD("patch sepolicy\n");
-    selinux_fixup();
-
     // common multiboot initialization
     if(multiboot_data.guid!=NULL && multiboot_data.path!=NULL) {
         multiboot_data.is_multiboot = 1;
@@ -708,10 +683,12 @@ int multiboot_main(UNUSED int argc, char** argv) {
                     MBABORT("raw device %s doesn't support bind mounts\n", rec->blk_device);
                 }
             }
-
-
         }
     }
+
+    // grant ourselves some selinux permissions :)
+    LOGD("patch sepolicy\n");
+    selinux_fixup();
 
     // boot recovery
     if(util_exists("/sbin/recovery", true)) {

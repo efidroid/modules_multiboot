@@ -35,7 +35,6 @@
     sigprocmask (SIG_UNBLOCK, &mask, NULL); \
 }
 
-int sepolicy_inject_main(int argc, char **argv);
 int busybox_main(int argc, char *argv[]);
 int mke2fs_main(int argc, char *argv[]);
 

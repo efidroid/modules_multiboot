@@ -44,15 +44,6 @@ add_definitions(-DDEVICE_NVVARS_PARTITION="${DEVICE_NVVARS_PARTITION}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMPLEFILENAME='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINI_STOP_ON_FIRST_ERROR=1")
 
-# sepolicy inject
-add_library(sepolicy-inject STATIC
-    lib/sepolicy-inject.c
-)
-target_link_libraries(sepolicy-inject sepol)
-set_target_properties(sepolicy-inject PROPERTIES
-  COMPILE_FLAGS "-pipe -fno-strict-aliasing"
-)
-
 # main
 add_executable(init
     # main code
@@ -83,7 +74,7 @@ add_executable(init
 target_link_libraries(init
     mke2fs e2p support com_err ext2fs
     busybox
-    blkid uuid sepolicy-inject dynfilefs syshook inih payload fuse pthread dl
+    blkid uuid sepolicy_inject sepol dynfilefs syshook inih payload fuse pthread dl
 )
 include_directories(
     include
