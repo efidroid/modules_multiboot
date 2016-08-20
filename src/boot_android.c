@@ -223,57 +223,8 @@ int boot_android(void) {
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
 
-    // boot main system
-    if(!multiboot_data->is_multiboot) {
-        LOGI("Booting main system\n");
-
-        pid_t pid = safe_fork();
-
-        // parent
-        if(pid) {
-            // install usr handler
-            util_setsighandler(SIGUSR1, init_usr_handler);
-
-            // wait for mbinit to finish
-            WAIT_FOR_SIGNAL(SIGUSR1, !init_usr_interrupt);
-
-            return run_init(0);
-        }
-
-        // child
-        else {
-            // add post-fs-data event
-            SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
-                     "on post-fs-data\n"
-                     "    start mbpostfs\n"
-                     "    wait "POSTFS_NOTIFICATION_FILE"\n"
-                     "\n"
-                     "service mbpostfs "MBPATH_TRIGGER_POSTFS_DATA" %u\n"
-                     "    disabled\n"
-                     "    oneshot\n"
-                     "\n",
-
-                     getpid()
-                    );
-            rc = util_append_string_to_file("/init.rc", buf);
-            if(rc) return rc;
-
-            // install postfs handler
-            util_setsighandler(SIGUSR1, mbinit_usr_handler);
-
-            // continue init
-            kill(getppid(), SIGUSR1);
-
-            // wait for postfs
-            WAIT_FOR_SIGNAL(SIGUSR1, !mbinit_usr_interrupt);
-
-            // we are not allowed to return
-            exit(0);
-        }
-    }
-
-    // boot multiboot system
-    else {
+    // multiboot setup
+    if(multiboot_data->is_multiboot) {
         // get directory of multiboot.ini
         char* basedir = util_dirname(multiboot_data->path);
         if(!basedir) {
@@ -367,7 +318,50 @@ int boot_android(void) {
 
         // close file
         close(fd);
+    }
+
+    LOGI("Booting Android\n");
+    pid_t pid = safe_fork();
+
+    // parent
+    if(pid) {
+        // install usr handler
+        util_setsighandler(SIGUSR1, init_usr_handler);
+
+        // wait for mbinit to finish
+        WAIT_FOR_SIGNAL(SIGUSR1, !init_usr_interrupt);
 
         return run_init(0);
+    }
+
+    // child
+    else {
+        // add post-fs-data event
+        SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
+                 "on post-fs-data\n"
+                 "    start mbpostfs\n"
+                 "    wait "POSTFS_NOTIFICATION_FILE"\n"
+                 "\n"
+                 "service mbpostfs "MBPATH_TRIGGER_POSTFS_DATA" %u\n"
+                 "    disabled\n"
+                 "    oneshot\n"
+                 "\n",
+
+                 getpid()
+                );
+        rc = util_append_string_to_file("/init.rc", buf);
+        if(rc) return rc;
+
+        // install postfs handler
+        util_setsighandler(SIGUSR1, mbinit_usr_handler);
+
+        // continue init
+        kill(getppid(), SIGUSR1);
+
+        // wait for postfs
+        WAIT_FOR_SIGNAL(SIGUSR1, !mbinit_usr_interrupt);
+
+        // we are not allowed to return
+        exit(0);
     }
 }
