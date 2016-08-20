@@ -247,7 +247,8 @@ int boot_android(void) {
             // wait for postfs
             WAIT_FOR_SIGNAL(SIGUSR1, !mbinit_usr_interrupt);
 
-            return rc;
+            // we are not allowed to return
+            exit(0);
         }
     }
 
