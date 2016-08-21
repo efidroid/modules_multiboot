@@ -532,6 +532,15 @@ int multiboot_main(UNUSED int argc, char** argv) {
         if(multiboot_data.romfstab) {
             multiboot_data.romfstabpath = safe_strdup("/etc/twrp.fstab");
         }
+
+        else {
+            // try /etc/recovery.fstab
+            LOGD("parse /etc/recovery.fstab\n");
+            multiboot_data.romfstab = fs_mgr_read_fstab("/etc/recovery.fstab");
+            if(multiboot_data.romfstab) {
+                multiboot_data.romfstabpath = safe_strdup("/etc/recovery.fstab");
+            }
+        }
     }
 
     // get ESP partition
