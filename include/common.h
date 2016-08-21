@@ -72,6 +72,7 @@ typedef struct {
     char* path;
     uevent_block_t* bootdev;
     int is_multiboot;
+    int is_recovery;
     int bootdev_supports_bindmount;
     multiboot_partition_t* mbparts;
     uint32_t num_mbparts;

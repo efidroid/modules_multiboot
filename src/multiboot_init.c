@@ -213,7 +213,7 @@ static int selinux_fixup(void) {
     // we ignore errors on purpose here because selinux might not be needed or supported by the system
 
     // don't apply patches in recovery mode
-    if(util_exists("/sbin/recovery", true))
+    if(multiboot_data.is_recovery)
         return 0;
 
     util_sepolicy_inject("init_multiboot", "rootfs", "filesystem", "associate");
@@ -430,6 +430,8 @@ int multiboot_main(UNUSED int argc, char** argv) {
     // init logging
     log_init();
 
+    multiboot_data.is_recovery = util_exists("/sbin/recovery", true);
+
     // set watchdog timer
     util_setsighandler(SIGALRM, alarm_signal);
     alarm(15);
@@ -521,7 +523,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
     multiboot_data.romfstab = fs_mgr_read_fstab(buf);
     if(!multiboot_data.romfstab) {
         // for Android, this fstab is mandatory
-        if(!util_exists("/sbin/recovery", true))
+        if(!multiboot_data.is_recovery)
             MBABORT("Can't parse %s: %s\n", buf, strerror(errno));
 
         // try /etc/twrp.fstab
@@ -695,12 +697,25 @@ int multiboot_main(UNUSED int argc, char** argv) {
         }
     }
 
+    // verify uefi partitions
+    for(i=0; i<multiboot_data.mbfstab->num_entries; i++) {
+        struct fstab_rec *rec;
+
+        // skip non-multiboot partitions
+        rec = &multiboot_data.mbfstab->recs[i];
+        if(!fs_mgr_is_uefi(rec)) continue;
+
+        if(strcmp(rec->fs_type, "emmc")) {
+            MBABORT("UEFI partition %s is not of type emmc\n", rec->mount_point);
+        }
+    }
+
     // grant ourselves some selinux permissions :)
     LOGD("patch sepolicy\n");
     selinux_fixup();
 
     // boot recovery
-    if(util_exists("/sbin/recovery", true)) {
+    if(multiboot_data.is_recovery) {
         LOGI("Booting recovery\n");
         return boot_recovery();
     }
