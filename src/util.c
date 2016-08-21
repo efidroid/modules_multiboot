@@ -245,7 +245,7 @@ int util_mount(const char *source, const char *target,
     }
 
     // get fstype
-    if(!filesystemtype) {
+    if(!filesystemtype && !(mountflags&MS_BIND)) {
         filesystemtype = util_fstype = util_get_fstype(source);
         if(!filesystemtype) {
             LOGE("can't get filesystem for %s\n", source);
