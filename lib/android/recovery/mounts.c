@@ -30,18 +30,6 @@
 #define LOG_TAG "MOUNTS"
 #include <lib/log.h>
 
-typedef struct {
-    mounted_volume_t *volumes;
-    int volumes_allocd;
-    int volume_count;
-} mounts_state_t;
-
-static mounts_state_t g_mounts_state = {
-    NULL,   // volumes
-    0,      // volumes_allocd
-    0       // volume_count
-};
-
 static inline void
 free_volume_internals(const mounted_volume_t *volume, int zero)
 {
@@ -56,36 +44,47 @@ free_volume_internals(const mounted_volume_t *volume, int zero)
     }
 }
 
+void
+free_mounts_state(mounts_state_t* mounts_states)
+{
+    int i;
+    for (i = 0; i < mounts_states->volume_count; i++) {
+        free_volume_internals(&mounts_states->volumes[i], 1);
+    }
+
+    memset(mounts_states, 0, sizeof(*mounts_states));
+}
+
 #define PROC_MOUNTS_FILENAME   "/proc/1/mountinfo"
 #define MBPROC_MOUNTS_FILENAME MBPATH_PROC"/1/mountinfo"
 #define PROC_MOUNTS_BUFSIZE 4096
 int
-scan_mounted_volumes(void)
+scan_mounted_volumes(mounts_state_t* mounts_states)
 {
     char *buf = NULL;
     const char *bufp;
     int fd;
     ssize_t nbytes;
 
-    if (g_mounts_state.volumes == NULL) {
+    if (mounts_states->volumes == NULL) {
         const int numv = 32;
         mounted_volume_t *volumes = malloc(numv * sizeof(*volumes));
         if (volumes == NULL) {
             errno = ENOMEM;
             return -1;
         }
-        g_mounts_state.volumes = volumes;
-        g_mounts_state.volumes_allocd = numv;
+        mounts_states->volumes = volumes;
+        mounts_states->volumes_allocd = numv;
         memset(volumes, 0, numv * sizeof(*volumes));
     } else {
         /* Free the old volume strings.
          */
         int i;
-        for (i = 0; i < g_mounts_state.volume_count; i++) {
-            free_volume_internals(&g_mounts_state.volumes[i], 1);
+        for (i = 0; i < mounts_states->volume_count; i++) {
+            free_volume_internals(&mounts_states->volumes[i], 1);
         }
     }
-    g_mounts_state.volume_count = 0;
+    mounts_states->volume_count = 0;
 
     buf = calloc(PROC_MOUNTS_BUFSIZE, 1);
     if(!buf) {
@@ -154,7 +153,7 @@ scan_mounted_volumes(void)
         }
 
         mounted_volume_t *v =
-                &g_mounts_state.volumes[g_mounts_state.volume_count++];
+                &mounts_states->volumes[mounts_states->volume_count++];
         v->id = id;
         v->parentid = parentid;
         v->major = major;
@@ -194,17 +193,17 @@ bail:
     free(buf);
 
 //TODO: free the strings we've allocated.
-    g_mounts_state.volume_count = 0;
+    mounts_states->volume_count = 0;
     return -1;
 }
 
 void
-dump_mounted_volumes(void)
+dump_mounted_volumes(mounts_state_t* mounts_states)
 {
-    if (g_mounts_state.volumes != NULL) {
+    if (mounts_states->volumes != NULL) {
         int i;
-        for (i = 0; i < g_mounts_state.volume_count; i++) {
-            mounted_volume_t *v = &g_mounts_state.volumes[i];
+        for (i = 0; i < mounts_states->volume_count; i++) {
+            mounted_volume_t *v = &mounts_states->volumes[i];
             LOGI("%i %i %u:%u %s %s %s - %s %s %s\n",
                 v->id, v->parentid, v->major, v->minor, v->mount_root, v->mount_point, v->flags, v->filesystem, v->device, v->fsflags);
         }
@@ -213,12 +212,12 @@ dump_mounted_volumes(void)
 
 
 const mounted_volume_t *
-find_mounted_volume_by_device(const char *device, int with_bindmounts)
+find_mounted_volume_by_device(mounts_state_t* mounts_states, const char *device, int with_bindmounts)
 {
-    if (g_mounts_state.volumes != NULL) {
+    if (mounts_states->volumes != NULL) {
         int i;
-        for (i = 0; i < g_mounts_state.volume_count; i++) {
-            mounted_volume_t *v = &g_mounts_state.volumes[i];
+        for (i = 0; i < mounts_states->volume_count; i++) {
+            mounted_volume_t *v = &mounts_states->volumes[i];
             /* May be null if it was unmounted and we haven't rescanned.
              */
             if (v->device != NULL) {
@@ -233,12 +232,12 @@ find_mounted_volume_by_device(const char *device, int with_bindmounts)
 }
 
 const mounted_volume_t *
-find_mounted_volume_by_mount_point(const char *mount_point)
+find_mounted_volume_by_mount_point(mounts_state_t* mounts_states, const char *mount_point)
 {
-    if (g_mounts_state.volumes != NULL) {
+    if (mounts_states->volumes != NULL) {
         int i;
-        for (i = 0; i < g_mounts_state.volume_count; i++) {
-            mounted_volume_t *v = &g_mounts_state.volumes[i];
+        for (i = 0; i < mounts_states->volume_count; i++) {
+            mounted_volume_t *v = &mounts_states->volumes[i];
             /* May be null if it was unmounted and we haven't rescanned.
              */
             if (v->mount_point != NULL) {
@@ -252,12 +251,12 @@ find_mounted_volume_by_mount_point(const char *mount_point)
 }
 
 const mounted_volume_t *
-find_mounted_volume_by_majmin(unsigned major, unsigned minor, int with_bindmounts)
+find_mounted_volume_by_majmin(mounts_state_t* mounts_states, unsigned major, unsigned minor, int with_bindmounts)
 {
-    if (g_mounts_state.volumes != NULL) {
+    if (mounts_states->volumes != NULL) {
         int i;
-        for (i = 0; i < g_mounts_state.volume_count; i++) {
-            mounted_volume_t *v = &g_mounts_state.volumes[i];
+        for (i = 0; i < mounts_states->volume_count; i++) {
+            mounted_volume_t *v = &mounts_states->volumes[i];
             /* May be null if it was unmounted and we haven't rescanned.
              */
             if (v->major == major && v->minor == minor) {
@@ -306,4 +305,3 @@ remount_read_only(const mounted_volume_t* volume)
                  MS_NOATIME | MS_NODEV | MS_NODIRATIME |
                  MS_RDONLY | MS_REMOUNT, 0);
 }
-

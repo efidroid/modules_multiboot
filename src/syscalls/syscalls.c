@@ -255,6 +255,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
     char kname[PATH_MAX];
     char buf[PATH_MAX];
     int rc;
+    mounts_state_t mounts_state = {0};
 
     if(!syshook_multiboot_data->is_multiboot)
         goto continue_syscall;
@@ -266,7 +267,7 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
     // unmount datamedia
     if(!strcmp(kname, "/data")) {
         // scan mounted volumes
-        rc = scan_mounted_volumes();
+        rc = scan_mounted_volumes(&mounts_state);
         if(rc) {
             MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
         }
@@ -275,11 +276,14 @@ SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
         SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kname);
 
         // check if datamedia is mounted at this path
-        const mounted_volume_t* volume = find_mounted_volume_by_mount_point(buf);
+        const mounted_volume_t* volume = find_mounted_volume_by_mount_point(&mounts_state, buf);
         if(volume) {
             LOGV("unmount datamedia for %s\n", kname);
             SAFE_UMOUNT(buf);
         }
+
+        // free mount state
+        free_mounts_state(&mounts_state);
     }
 
 continue_syscall:

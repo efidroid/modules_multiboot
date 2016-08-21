@@ -47,6 +47,7 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
     char* esp_mountpoint = NULL;
+    mounts_state_t mounts_state = {0};
 
     // ignore further signals
     if(mbinit_usr_interrupt)
@@ -56,14 +57,14 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     mbinit_usr_interrupt = 1;
 
     // scan mounted volumes
-    rc = scan_mounted_volumes();
+    rc = scan_mounted_volumes(&mounts_state);
     if(rc) {
         MBABORT_IF_MB("Can't scan mounted volumes: %s\n", strerror(errno));
         goto finish;
     }
 
     // find ESP volume
-    const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data->espdev->major, multiboot_data->espdev->minor, 0);
+    const mounted_volume_t* volume = find_mounted_volume_by_majmin(&mounts_state, multiboot_data->espdev->major, multiboot_data->espdev->minor, 0);
     if(!volume) {
         LOGI("ESP is not mounted. do this now.\n");
 
@@ -80,6 +81,9 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
             goto finish;
         }
     }
+
+    // free mount state
+    free_mounts_state(&mounts_state);
 
     // get espdir
     esp_mountpoint = util_get_espdir(volume->mount_point);

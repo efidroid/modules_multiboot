@@ -233,18 +233,26 @@ int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int
 int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor) {
     int rc;
     const mounted_volume_t* volume;
+    mounts_state_t mounts_state = {0};
 
-    rc = scan_mounted_volumes();
+    rc = scan_mounted_volumes(&mounts_state);
     if(rc) {
         MBABORT("Can't scan mounted volumes\n");
     }
 
-    volume =  find_mounted_volume_by_mount_point(mountpoint);
-    if(!volume)
-        return -ENOENT;
+    volume =  find_mounted_volume_by_mount_point(&mounts_state, mountpoint);
+    if(!volume) {
+        rc = -ENOENT;
+    }
+    else {
+        *major = volume->major;
+        *minor = volume->minor;
 
-    *major = volume->major;
-    *minor = volume->minor;
+        // free mount state
+        free_mounts_state(&mounts_state);
+
+        rc = 0;
+    }
 
     return 0;
 }
@@ -252,6 +260,7 @@ int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* mi
 static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     int rc;
     const char* mountpoint = NULL;
+    mounts_state_t mounts_state = {0};
 
     if(replacement) {
         LOGI("%s got formatted. syncing ESP replacement\n", replacement->loopdevice);
@@ -261,14 +270,14 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     }
 
     // scan mounted volumes
-    rc = scan_mounted_volumes();
+    rc = scan_mounted_volumes(&mounts_state);
     if(rc) {
         MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
         return -1;
     }
 
     // find esp
-    const mounted_volume_t* volume = find_mounted_volume_by_majmin(syshook_multiboot_data->espdev->major, syshook_multiboot_data->espdev->minor, 0);
+    const mounted_volume_t* volume = find_mounted_volume_by_majmin(&mounts_state, syshook_multiboot_data->espdev->major, syshook_multiboot_data->espdev->minor, 0);
     if(volume) {
         mountpoint = volume->mount_point;
     }
@@ -334,6 +343,10 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     if(!volume) {
         // unmount ESP
         SAFE_UMOUNT(MBPATH_ESP);
+    }
+    else {
+        // free mount state
+        free_mounts_state(&mounts_state);
     }
 
     // cleanup

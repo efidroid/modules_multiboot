@@ -34,14 +34,22 @@ typedef struct {
     const char *fsflags;
 } mounted_volume_t;
 
-int scan_mounted_volumes(void);
-void dump_mounted_volumes(void);
+typedef struct {
+    mounted_volume_t *volumes;
+    int volumes_allocd;
+    int volume_count;
+} mounts_state_t;
 
-const mounted_volume_t *find_mounted_volume_by_device(const char *device, int with_bindmounts);
+void free_mounts_state(mounts_state_t* mounts_states);
+
+int scan_mounted_volumes(mounts_state_t* mounts_states);
+void dump_mounted_volumes(mounts_state_t* mounts_states);
+
+const mounted_volume_t *find_mounted_volume_by_device(mounts_state_t* mounts_states, const char *device, int with_bindmounts);
 const mounted_volume_t *
-find_mounted_volume_by_mount_point(const char *mount_point);
+find_mounted_volume_by_mount_point(mounts_state_t* mounts_states, const char *mount_point);
 const mounted_volume_t *
-find_mounted_volume_by_majmin(unsigned major, unsigned minor, int with_bindmounts);
+find_mounted_volume_by_majmin(mounts_state_t* mounts_states, unsigned major, unsigned minor, int with_bindmounts);
 
 int unmount_mounted_volume(const mounted_volume_t *volume);
 int unmount_mounted_volume_detach(const mounted_volume_t *volume);

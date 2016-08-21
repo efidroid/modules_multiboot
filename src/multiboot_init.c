@@ -644,14 +644,17 @@ int multiboot_main(UNUSED int argc, char** argv) {
                 MBABORT("Can't mount data: %s\n", strerror(errno));
         }
 
-        // check for bind-mount support
+        // scan mounts
+        mounts_state_t mounts_state = {0};
         LOGV("scan mounted volumes\n");
-        rc = scan_mounted_volumes();
+        rc = scan_mounted_volumes(&mounts_state);
         if(rc) {
             MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
         }
+
+        // check for bind-mount support
         LOGV("search mounted bootdev\n");
-        const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data.bootdev->major, multiboot_data.bootdev->minor, 0);
+        const mounted_volume_t* volume = find_mounted_volume_by_majmin(&mounts_state, multiboot_data.bootdev->major, multiboot_data.bootdev->minor, 0);
         if(!volume) {
             MBABORT("boot device not mounted (DAFUQ?)\n");
         }
@@ -659,6 +662,9 @@ int multiboot_main(UNUSED int argc, char** argv) {
             LOGD("bootdev has bind mount support\n");
             multiboot_data.bootdev_supports_bindmount = 1;
         }
+
+        // free mount state
+        free_mounts_state(&mounts_state);
 
         // build multiboot.ini filename
         SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s", multiboot_data.path);
