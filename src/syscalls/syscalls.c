@@ -117,6 +117,10 @@ run_syscall:
         fdinfo_add(process, ret, abspath, flags, major, minor);
     }
 
+    if(replacement) {
+        LOGV("%s: redirect %s -> %s = %d\n", __func__, kfilename, replacement->loopdevice, (int)ret);
+    }
+
     // free unused child memory
     if(uabspath) {
         syshook_free_user(process, uabspath, uabspath_len);
@@ -184,6 +188,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
 
         // mount directly
         ret = mount(replacement->u.multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
+        LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->u.multiboot.partpath, kdirname, (int)ret);
         if(ret) return ret;
 
         // mount datamedia
@@ -233,6 +238,10 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
 
 continue_syscall:
     ret = syshook_invoke_hookee(process);
+
+    if(replacement) {
+        LOGV("%s: redirect %s -> %s = %d\n", __func__, kdevname, replacement->loopdevice, (int)ret);
+    }
 
     if(udevname) {
         syshook_free_user(process, udevname, udevname_len);
