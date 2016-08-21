@@ -274,7 +274,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     }
     else {
         // mount ESP
-        util_mount_esp();
+        util_mount_esp(1);
 
         mountpoint = MBPATH_ESP;
     }
@@ -287,7 +287,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
 
     if(replacement) {
         // get ESP filename
-        char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
+        char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->rec);
         if(!espfilename) {
             MBABORT("Can't get filename\n");
         }
@@ -312,7 +312,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
             pthread_mutex_lock(&replacement->lock);
 
             // get ESP filename
-            char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->u.native.rec);
+            char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->rec);
             if(!espfilename) {
                 MBABORT("Can't get filename\n");
             }

@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <stdio.h>
 
 #include <lib/mounts.h>
@@ -33,14 +34,18 @@
 
 static multiboot_data_t* multiboot_data = NULL;
 
+#define MBABORT_IF_MB(fmt, ...) do { \
+    if(multiboot_data->is_multiboot) \
+        MBABORT(fmt, ##__VA_ARGS__); \
+    else \
+        LOGE(fmt, ##__VA_ARGS__); \
+}while(0)
+
 static volatile sig_atomic_t mbinit_usr_interrupt = 0;
 static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp) {
     int rc;
-    int i;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
-    char buf3[PATH_MAX];
-    char* name = NULL;
     char* esp_mountpoint = NULL;
 
     // ignore further signals
@@ -53,21 +58,34 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     // scan mounted volumes
     rc = scan_mounted_volumes();
     if(rc) {
-        LOGE("Can't scan mounted volumes: %s\n", strerror(errno));
+        MBABORT_IF_MB("Can't scan mounted volumes: %s\n", strerror(errno));
         goto finish;
     }
 
     // find ESP volume
     const mounted_volume_t* volume = find_mounted_volume_by_majmin(multiboot_data->espdev->major, multiboot_data->espdev->minor, 0);
     if(!volume) {
-        LOGE("ESP is not yet mounted\n");
-        goto finish;
+        LOGI("ESP is not mounted. do this now.\n");
+
+        // bind-mount ESP to our dir
+        util_mount_esp(multiboot_data->is_multiboot);
+    }
+    else {
+        LOGI("bind-mount ESP to %s\n", MBPATH_ESP);
+
+        // bind-mount ESP to our dir
+        rc = util_mount(volume->mount_point, MBPATH_ESP, NULL, MS_BIND, NULL);
+        if(rc) {
+            MBABORT_IF_MB("can't bind-mount ESP to %s: %s\n", MBPATH_ESP, strerror(errno));
+            goto finish;
+        }
     }
 
     // get espdir
     esp_mountpoint = util_get_espdir(volume->mount_point);
     if(!esp_mountpoint) {
-        LOGE("Can't get ESP directory: %s\n", strerror(errno));
+        MBABORT_IF_MB("Can't get ESP directory: %s\n", strerror(errno));
+        rc = -ENOENT;
         goto finish;
     }
 
@@ -75,108 +93,84 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     if(!util_exists(esp_mountpoint, true)) {
         rc = util_mkdir(esp_mountpoint);
         if(rc) {
-            LOGE("Can't create directory at %s\n", esp_mountpoint);
+            MBABORT_IF_MB("Can't create directory at %s\n", esp_mountpoint);
             goto finish;
         }
     }
 
-    for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
-        struct fstab_rec *rec;
-
-        // skip non-uefi partitions
-        rec = &multiboot_data->mbfstab->recs[i];
-        if(!fs_mgr_is_uefi(rec)) continue;
-
-        // build devicenode path
-        name = util_basename(rec->mount_point);
-        if(!name) {
-            LOGE("Can't get basename of %s\n", rec->mount_point);
-            rc = -1;
-            goto finish;
-        }
+    part_replacement_t *replacement;
+    list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
+        struct fstab_rec *rec = replacement->rec;
+        struct stat sb_orig;
+        struct stat sb_loop;
 
         // resolve symlinks for device node
         char* blk_device = realpath(rec->blk_device, buf);
         if(!blk_device) {
-            LOGE("Can't get real path for %s\n", rec->blk_device);
-            rc = -errno;
+            MBABORT_IF_MB("Can't get real path for %s\n", rec->blk_device);
+            rc = -1;
             goto finish;
         }
 
         // stat original device
-        struct stat sb;
-        rc = stat(blk_device, &sb);
+        rc = stat(blk_device, &sb_orig);
         if(rc) {
-            LOGE("Can't stat device at %s\n", blk_device);
+            MBABORT_IF_MB("Can't stat device at %s\n", blk_device);
             goto finish;
         }
 
         // create path for backup node
-        rc = snprintf(buf3, sizeof(buf3), "%s/replacement_backup_%s", MBPATH_DEV, name);
-        if(SNPRINTF_ERROR(rc, sizeof(buf3))) {
-            LOGE("Can't build name for partition image\n");
+        rc = snprintf(buf2, sizeof(buf2), "%s/replacement_backup_%s", MBPATH_DEV, rec->mount_point+1);
+        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
+            MBABORT_IF_MB("Can't build name for backup node\n");
             goto finish;
         }
 
         // create backup node
-        rc = mknod(buf3, S_IRUSR | S_IWUSR | S_IFBLK, makedev(major(sb.st_rdev), minor(sb.st_rdev)));
+        rc = mknod(buf2, S_IRUSR | S_IWUSR | S_IFBLK, makedev(major(sb_orig.st_rdev), minor(sb_orig.st_rdev)));
         if (rc) {
-            LOGE("Can't create backup node for device %s\n", buf3);
+            MBABORT_IF_MB("Can't create backup node for device %s\n", buf2);
             goto finish;
-        }
-
-        // get number of blocks
-        unsigned long num_blocks = 0;
-        util_block_num(blk_device, &num_blocks);
-
-        // create path for loop image
-        rc = snprintf(buf2, sizeof(buf2), "%s/partition_%s.img", esp_mountpoint, name);
-        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
-            LOGE("Can't build name for partition image\n");
-            goto finish;
-        }
-
-        // create raw image if it doesn't exists yet
-        // or if it's size doesn't match the original partition
-        if(!util_exists(buf2, false) || util_filesize(buf2, false)!=num_blocks*512llu) {
-            rc = util_dd(blk_device, buf2, 0);
-            if(rc) {
-                LOGE("Can't copy %s to %s\n", blk_device, buf2);
-                goto finish;
-            }
         }
 
         // delete original node
         if(util_exists(blk_device, false)) {
             rc = unlink(blk_device);
             if(rc) {
-                LOGE("Can't delete %s\n", blk_device);
+                MBABORT_IF_MB("Can't delete %s\n", blk_device);
                 goto finish;
             }
         }
 
+        // stat loop device
+        rc = stat(replacement->loopdevice, &sb_loop);
+        if(rc) {
+            MBABORT_IF_MB("Can't stat device at %s\n", replacement->loopdevice);
+            goto finish;
+        }
+
         // create new node
-        rc = util_make_loop(blk_device);
-        if(rc) {
-            LOGE("Can't create loop device at %s\n", blk_device);
+        rc = mknod(blk_device, sb_orig.st_mode, makedev(major(sb_loop.st_rdev), minor(sb_loop.st_rdev)));
+        if (rc) {
+            MBABORT_IF_MB("Can't create replacement node at %s\n", blk_device);
             goto finish;
         }
 
-        // setup loop device
-        rc = util_losetup(blk_device, buf2, false);
-        if(rc) {
-            LOGE("Can't setup loop device at %s for %s\n", blk_device, buf2);
-            goto finish;
+        if(replacement->loopfile) {
+            // setup loop device
+            rc = util_losetup(replacement->loopdevice, replacement->loopfile, false);
+            if(rc) {
+                MBABORT_IF_MB("Can't setup loop device at %s for %s\n", blk_device, replacement->loopfile);
+                goto finish;
+            }
         }
-
-        // cleanup
-        free(name);
-        name = NULL;
     }
 
 finish:
-    free(name);
     free(esp_mountpoint);
+
+    if(multiboot_data->is_multiboot && rc)
+        MBABORT("postfs init failed: rc=%d errno=%d\n", rc, errno);
 
     // continue trigger-postfs
     kill(info->si_pid, SIGUSR1);
@@ -223,6 +217,8 @@ int boot_android(void) {
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
 
+    util_setup_partition_replacements();
+
     // multiboot setup
     if(multiboot_data->is_multiboot) {
         // get directory of multiboot.ini
@@ -265,20 +261,7 @@ int boot_android(void) {
                 }
                 else {
                     // build loop path
-                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_DEV"/block/mbloop_%s", part->name);
-
-                    // create new node
-                    rc = util_make_loop(buf2);
-                    if(rc) {
-                        MBABORT("Can't create loop device at %s\n", buf2);
-                    }
-
-                    // setup loop device
-                    rc = util_losetup(buf2, buf, false);
-                    if(rc) {
-                        MBABORT("Can't setup loop device at %s for %s\n", buf2, buf);
-                    }
-
+                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_DEV"/block/loopdev:%s", part->name);
                     blk_device = buf2;
                 }
 

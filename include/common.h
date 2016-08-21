@@ -97,11 +97,14 @@ typedef struct {
     list_node_t node;
     pthread_mutex_t lock;
 
+    struct fstab_rec* rec;
     unsigned major;
     unsigned minor;
 
     // raw part for loop, stub part for bind
     char* loopdevice;
+    // set if the losetup hasn't been done yet
+    char* loopfile;
 
     union {
         struct {
@@ -110,10 +113,6 @@ typedef struct {
             // bind
             char* partpath;
         } multiboot;
-
-        struct {
-            struct fstab_rec* rec;
-        } native;
     } u;
 } part_replacement_t;
 

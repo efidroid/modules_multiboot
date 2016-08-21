@@ -226,19 +226,24 @@ static int selinux_fixup(void) {
     util_sepolicy_inject("init", "kernel", "process", "signal");
 
     // let init.multiboot do it's postfs work
+    util_sepolicy_inject("kernel", "tmpfs", "dir", "mounton");
     util_sepolicy_inject("kernel", "kernel", "capability", "mknod");
-    util_sepolicy_inject("kernel", "rootfs", "chr_file", "write");
     util_sepolicy_inject("kernel", "init", "dir", "search");
     util_sepolicy_inject("kernel", "init", "file", "read,open");
     util_sepolicy_inject("kernel", "init", "process", "signal");
-    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
     util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
-    util_sepolicy_inject("kernel", "block_device", "blk_file", "create");
+    util_sepolicy_inject("kernel", "block_device", "blk_file", "create,unlink");
+    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+    util_sepolicy_inject("kernel", "cache_block_device", "blk_file", "unlink");
+    util_sepolicy_inject("kernel", "userdata_block_device", "blk_file", "unlink");
     util_sepolicy_inject("kernel", "device", "dir", "write,add_name");
-    util_sepolicy_inject("kernel", "device", "blk_file", "create");
+    util_sepolicy_inject("kernel", "device", "blk_file", "create,read,write");
     util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "getattr,search");
     util_sepolicy_inject("kernel", "media_rw_data_file", "file", "getattr,read,write,open");
-    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+
+    // for access to /dev/fuse
+    util_sepolicy_inject("kernel", "rootfs", "chr_file", "read,write");
 
     // for our restorecon injections
     util_sepolicy_inject("init", "rootfs", "dir", "relabelto");
