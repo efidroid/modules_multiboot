@@ -625,37 +625,19 @@ multiboot_partition_t* util_mbpart_by_name(const char* name) {
     return NULL;
 }
 
-void util_mount_esp(int abort_on_error) {
+int util_mount_esp(int abort_on_error) {
     int rc;
-    unsigned long mountflags = 0;
-    const void* data = NULL;
-
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
-    // find ESP in the rom's fstab
-    struct fstab_rec* esprec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, multiboot_data->espdev);
-    if(esprec) {
-        // use the ROM's mount options for this partition
-        mountflags = esprec->flags;
-        data = (void*)esprec->fs_options;
-        LOGD("use ROM mountflags for ESP, flags:%lu, data:%s\n", mountflags, (const char*)data);
+    rc = util_mount_blockinfo_with_romflags(multiboot_data->espdev, MBPATH_ESP);
+    if(rc) {
+        if(abort_on_error)
+            MBABORT("Can't mount ESP: %s\n", strerror(errno));
+        else
+            LOGE("Can't mount ESP: %s\n", strerror(errno));
     }
 
-    // mount ESP
-    rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-    if(rc) {
-        // mount without flags
-        LOGI("mount ESP without flags\n");
-        mountflags = 0;
-        data = NULL;
-        rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, mountflags, data);
-        if(rc) {
-            if(abort_on_error)
-                MBABORT("Can't mount ESP: %s\n", strerror(errno));
-            else
-                LOGE("Can't mount ESP: %s\n", strerror(errno));
-        }
-    }
+    return 0;
 }
 
 int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
@@ -1016,4 +998,60 @@ int util_setup_partition_replacements(void) {
     }
 
     return 0;
+}
+
+int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+    int rc;
+
+    // get the ROM's mount flags
+    unsigned long mountflags = 0;
+    const void* data = NULL;
+    struct fstab_rec* romrec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, bi);
+    if(romrec) {
+        mountflags = romrec->flags;
+        data = (void*)romrec->fs_options;
+        LOGD("use ROM mountflags for %s, flags:%lu, data:%s\n", bi->devname, mountflags, (const char*)data);
+    }
+
+    // mount data
+    LOGD("mount %s at %s\n", bi->devname, mountpoint);
+    rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
+    if(rc) {
+        // mount without flags
+        LOGI("mount %s without flags\n", bi->devname);
+        mountflags = 0;
+        data = NULL;
+        rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
+        if(rc) {
+            LOGE("Can't mount %s: %s\n", bi->devname, strerror(errno));
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    // get rec from mb fstab
+    LOGV("search fstab.multiboot for %s\n", name);
+    struct fstab_rec* mbrec = fs_mgr_get_by_mountpoint(multiboot_data->mbfstab, name);
+    if(!mbrec) {
+        LOGE("Can't get rec for %s\n", name);
+        errno = ENOENT;
+        return -1;
+    }
+
+    // get blockinfo
+    LOGV("get blockinfo for %s\n", mbrec->blk_device);
+    uevent_block_t* bi = get_blockinfo_for_path(multiboot_data->blockinfo, mbrec->blk_device);
+    if(!bi) {
+        LOGE("Can't get blockinfo for %s\n", mbrec->blk_device);
+        errno = ENOENT;
+        return -1;
+    }
+
+    return util_mount_blockinfo_with_romflags(bi, mountpoint);
 }

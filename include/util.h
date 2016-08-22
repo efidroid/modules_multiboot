@@ -67,8 +67,10 @@ char* util_getmbpath_from_device(const char* device);
 int util_fs_supports_multiboot_bind(const char* type);
 char* util_device_from_mbname(const char* name);
 multiboot_partition_t* util_mbpart_by_name(const char* name);
-void util_mount_esp(int abort_on_error);
+int util_mount_esp(int abort_on_error);
 int util_dynfilefs(const char *_source, const char *_target, uint64_t size);
 int util_setup_partition_replacements(void);
+int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint);
+int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint);
 
 #endif

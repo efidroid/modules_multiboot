@@ -69,7 +69,11 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
         LOGI("ESP is not mounted. do this now.\n");
 
         // bind-mount ESP to our dir
-        util_mount_esp(multiboot_data->is_multiboot);
+        rc = util_mount_esp(multiboot_data->is_multiboot);
+        if(rc) {
+            MBABORT_IF_MB("Can't mount ESP: %s\n", strerror(errno));
+            goto finish;
+        }
     }
     else {
         LOGI("bind-mount ESP to %s\n", MBPATH_ESP);

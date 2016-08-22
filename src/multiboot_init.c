@@ -582,66 +582,17 @@ int multiboot_main(UNUSED int argc, char** argv) {
         }
         LOGI("Boot device: %s\n", multiboot_data.bootdev->devname);
 
-        // try to use the ROM's mountflags
-        unsigned long mountflags = 0;
-        const void* data = NULL;
-        struct fstab_rec* bootdevrec = fs_mgr_get_by_ueventblock(multiboot_data.romfstab, multiboot_data.bootdev);
-        if(bootdevrec) {
-            // use the ROM's mount options for this partition
-            mountflags = bootdevrec->flags;
-            data = (void*)bootdevrec->fs_options;
-
-            LOGD("use ROM mountflags for bootdev, flags:%lu, data:%s\n", mountflags, (const char*)data);
-        }
-
         // mount bootdev
         LOGD("mount boot device\n");
-        rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, mountflags, data);
+        rc = util_mount_blockinfo_with_romflags(multiboot_data.bootdev, MBPATH_BOOTDEV);
         if(rc) {
-            // mount without flags
-            LOGI("mount bootdev without flags\n");
-            mountflags = 0;
-            data = NULL;
-            rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, mountflags, data);
-            if(rc)
-                MBABORT("Can't mount boot device: %s\n", strerror(errno));
-        }
-
-        // get rec for /data
-        LOGV("search for /data\n");
-        struct fstab_rec* datarecmb = fs_mgr_get_by_mountpoint(multiboot_data.mbfstab, "/data");
-        if(!datarecmb) {
-            MBABORT("Can't get rec for /data\n");
-        }
-
-        // get blockinfo for /data
-        LOGV("get blockinfo for /data\n");
-        uevent_block_t* datablock = get_blockinfo_for_path(multiboot_data.blockinfo, datarecmb->blk_device);
-        if(!datablock) {
-            MBABORT("Can't get blockinfo for %s\n", datarecmb->blk_device);
-        }
-
-        // get the ROM's mount flags for /data
-        mountflags = 0;
-        data = NULL;
-        struct fstab_rec* datarec = fs_mgr_get_by_ueventblock(multiboot_data.romfstab, datablock);
-        if(datarec) {
-            mountflags = datarec->flags;
-            data = (void*)datarec->fs_options;
-            LOGD("use ROM mountflags for /data, flags:%lu, data:%s\n", mountflags, (const char*)data);
+            MBABORT("Can't mount boot device: %s\n", strerror(errno));
         }
 
         // mount data
-        LOGD("mount /data\n");
-        rc = uevent_mount(datablock, MBPATH_DATA, NULL, mountflags, data);
+        rc = util_mount_mbinipart_with_romflags("/data", MBPATH_DATA);
         if(rc) {
-            // mount without flags
-            LOGI("mount /data without flags\n");
-            mountflags = 0;
-            data = NULL;
-            rc = uevent_mount(datablock, MBPATH_DATA, NULL, mountflags, data);
-            if(rc)
-                MBABORT("Can't mount data: %s\n", strerror(errno));
+            MBABORT("Can't mount data: %s\n", strerror(errno));
         }
 
         // scan mounts
