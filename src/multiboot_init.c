@@ -227,7 +227,7 @@ static int selinux_fixup(void) {
 
     // let init.multiboot do it's postfs work
     util_sepolicy_inject("kernel", "tmpfs", "dir", "mounton");
-    util_sepolicy_inject("kernel", "kernel", "capability", "mknod");
+    util_sepolicy_inject("kernel", "kernel", "capability", "mknod,sys_admin");
     util_sepolicy_inject("kernel", "init", "dir", "search");
     util_sepolicy_inject("kernel", "init", "file", "read,open");
     util_sepolicy_inject("kernel", "init", "process", "signal");
