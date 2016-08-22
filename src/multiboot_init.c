@@ -212,9 +212,23 @@ static int selinux_fixup(void) {
 
     // we ignore errors on purpose here because selinux might not be needed or supported by the system
 
-    // don't apply patches in recovery mode
-    if(multiboot_data.is_recovery)
-        return 0;
+    // recovery
+    if(multiboot_data.is_recovery) {
+        util_sepolicy_inject("kernel", "kernel", "process", "execmem");
+        util_sepolicy_inject("kernel", "init", "process", "ptrace");
+        util_sepolicy_inject("kernel", "kernel", "capability", "sys_ptrace");
+        util_sepolicy_inject("kernel", "healthd", "process", "ptrace");
+        util_sepolicy_inject("kernel", "ueventd", "process", "ptrace");
+        util_sepolicy_inject("kernel", "recovery", "process", "ptrace");
+        util_sepolicy_inject("kernel", "adbd", "process", "ptrace");
+        util_sepolicy_inject("kernel", "su", "process", "ptrace");
+
+        util_sepolicy_inject("init", "kernel", "process", "sigchld");
+        util_sepolicy_inject("healthd", "kernel", "process", "sigchld");
+        util_sepolicy_inject("recovery", "kernel", "process", "sigchld");
+        util_sepolicy_inject("adbd", "kernel", "process", "sigchld");
+        util_sepolicy_inject("ueventd", "kernel", "process", "sigchld");
+    }
 
     util_sepolicy_inject("init_multiboot", "rootfs", "filesystem", "associate");
     util_sepolicy_inject("init", "init_multiboot", "file", "relabelto,getattr,execute,read,execute_no_trans,open");
