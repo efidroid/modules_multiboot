@@ -33,6 +33,7 @@
 #include <lib/dynfilefs.h>
 #include <blkid/blkid.h>
 #include <sepolicy_inject.h>
+#include <ini.h>
 
 #include <common.h>
 #include <util.h>
@@ -689,6 +690,152 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
     return rc;
 }
 
+static uint32_t util_get_mb_sdk_version(void) {
+    const char* systempath;
+    char buf[PATH_MAX];
+    ssize_t bytecount;
+    int rc;
+
+    part_replacement_t* replacement = util_get_replacement_by_name("system");
+    if(!replacement) {
+        MBABORT("Can't find replacement partition for system\n");
+    }
+
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
+        // mount system
+        rc = util_mount(replacement->loopdevice, MBPATH_MB_SYSTEM, NULL, 0, NULL);
+        if(rc) {
+            MBABORT("Can't mount system: %s\n", strerror(errno));
+        }
+
+        systempath = MBPATH_MB_SYSTEM;
+    }
+    else {
+        systempath = replacement->u.multiboot.partpath;
+    }
+
+    // read sdk version
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/build.prop", systempath);
+    char* prop = util_get_property(buf, "ro.build.version.sdk");
+    if(!prop) {
+        MBABORT("Can't read property from %s: %s\n", buf, strerror(errno));
+    }
+
+    // convert sdk version to int
+    uint32_t sdk_version;
+    bytecount = sscanf(prop, "%u", &sdk_version);
+    free(prop);
+    if (bytecount != 1) {
+        MBABORT("Can't convert\n");
+    }
+
+    // unmount system
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
+        SAFE_UMOUNT(MBPATH_MB_SYSTEM);
+    }
+
+    return sdk_version;
+}
+
+static void util_prepare_multiboot_data(void) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+    int rc;
+    uint32_t sdk_version;
+    const char* datapath;
+    char buf[PATH_MAX];
+
+    // get sdk version
+    sdk_version = util_get_mb_sdk_version();
+    LOGI("SDK version: %u\n", sdk_version);
+
+    // determine required layout version
+    uint32_t layout_version_needed;
+    if(sdk_version<17)
+        layout_version_needed = 0;
+    else if(sdk_version<20)
+        layout_version_needed = 2;
+    else
+        layout_version_needed = 3;
+
+    // get data replacement
+    part_replacement_t* replacement = util_get_replacement_by_name("data");
+    if(!replacement) {
+        MBABORT("Can't find replacement partition for data\n");
+    }
+
+    // mount data partition
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
+        // mount system
+        rc = util_mount(replacement->loopdevice, MBPATH_MB_DATA, NULL, 0, NULL);
+        if(rc) {
+            MBABORT("Can't mount data: %s\n", strerror(errno));
+        }
+
+        datapath = MBPATH_MB_DATA;
+    }
+    else {
+        datapath = replacement->u.multiboot.partpath;
+    }
+
+    // get layout version
+    uint32_t layout_version;
+    SAFE_SNPRINTF_RET(LOGE, , buf, sizeof(buf), "%s/.layout_version", datapath);
+    rc = util_read_int(buf, &layout_version);
+    if(rc) {
+        layout_version = 0;
+    }
+    LOGI("MB layout_version: %u\n", layout_version);
+
+    // determine bind-mount mapping
+    const char* datamedia_source = NULL;
+    const char* datamedia_target = NULL;
+    if(ANYEQ_2(multiboot_data->native_data_layout_version, 0, 1))
+        datamedia_source = MBPATH_DATA"/media";
+    else if(ANYEQ_2(multiboot_data->native_data_layout_version, 2, 3))
+        datamedia_source = MBPATH_DATA"/media/0";
+    if(ANYEQ_2(layout_version_needed, 0, 1))
+        datamedia_target = "/media";
+    else if(ANYEQ_2(layout_version_needed, 2, 3))
+        datamedia_target = "/media/0";
+
+    // verify results
+    if(datamedia_source==NULL || datamedia_target==NULL) {
+        MBABORT("datamedia_source=%s datamedia_target=%s\n", datamedia_source?:"(null)", datamedia_target?:"(null)");
+    }
+
+    // upgrade/downgrade target layout version
+    if(layout_version>0 && layout_version_needed>0 && layout_version!=layout_version_needed) {
+        rc = util_write_int(buf, layout_version_needed);
+        if(rc) {
+            MBABORT("can't set layout version to %u\n", layout_version_needed);
+        }
+    }
+
+    // create mount source directory
+    if(!util_exists(datamedia_source, false)) {
+        rc = util_mkdir(datamedia_source);
+        if(rc) {
+            MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
+        }
+    }
+
+    // create mount target directory
+    SAFE_SNPRINTF_RET(LOGE, , buf, sizeof(buf), MBPATH_MB_DATA"%s", datamedia_target);
+    if(!util_exists(buf, false)) {
+        rc = util_mkdir(buf);
+        if(rc) {
+            MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
+        }
+    }
+
+    multiboot_data->datamedia_target = datamedia_target;
+    multiboot_data->datamedia_source = datamedia_source;
+
+    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
+        SAFE_UMOUNT(MBPATH_MB_DATA);
+    }
+}
+
 int util_setup_partition_replacements(void) {
     multiboot_data_t* multiboot_data = multiboot_get_data();
 
@@ -876,6 +1023,11 @@ int util_setup_partition_replacements(void) {
         // TODO: check for optional replacement partitions
 
         free(basedir);
+
+        // prepare datamedia setup
+        if(!multiboot_data->is_recovery) {
+            util_prepare_multiboot_data();
+        }
     }
 
     // internal system
@@ -1054,4 +1206,107 @@ int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint)
     }
 
     return util_mount_blockinfo_with_romflags(bi, mountpoint);
+}
+
+typedef struct {
+    const char* propertyname;
+    char* value;
+} getprop_pdata_t;
+
+static int getprop_handler(void* user, UNUSED const char* section, const char* name, const char* value) {
+    getprop_pdata_t* pdata = user;
+
+    // we're interested in partitions only
+    if(!strcmp(name, pdata->propertyname)) {
+        pdata->value = safe_strdup(value);
+        return 0;
+    }
+
+    return 1;
+}
+
+char* util_get_property(const char* filename, const char* propertyname) {
+    getprop_pdata_t pdata = {
+        .propertyname = propertyname,
+        .value = NULL,
+    };
+    ini_parse(filename, getprop_handler, &pdata);
+    return pdata.value;
+}
+
+int util_read_int(const char* filename, uint32_t* pvalue) {
+    int rc;
+
+    // validate arguments
+    if(!filename || !pvalue) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    // open file
+    int fd = open(filename, O_RDONLY);
+    if(fd<0) return -1;
+
+    // read file
+    char buffer[20];
+    if(read(fd, buffer, sizeof(buffer))<0) {
+        rc = -1;
+        goto close_file;
+    }
+
+    // parse data
+    if (sscanf(buffer, "%u", pvalue) != 1) {
+        rc = -1;
+        goto close_file;
+    }
+
+    rc = 0;
+
+close_file:
+    close(fd);
+
+    return rc;
+}
+
+int util_write_int(char const* path, int value) {
+    int rc;
+    ssize_t byte_count;
+
+    // open file
+    int fd = open(path, O_WRONLY|O_TRUNC|O_CREAT);
+    if(fd<0) return -1;
+
+    // convert value
+    char buffer[20];
+    rc = snprintf(buffer, sizeof(buffer), "%d\n", value);
+    if(SNPRINTF_ERROR(rc, sizeof(buffer))) {
+        rc = -1;
+        goto close_file;
+    }
+
+    // write value
+    byte_count = write(fd, buffer, rc);
+    if(byte_count<0 || byte_count!=rc) {
+        rc = -1;
+        goto close_file;
+    }
+
+    rc = 0;
+
+close_file:
+    close(fd);
+
+    return rc;
+}
+
+part_replacement_t* util_get_replacement_by_name(const char* name) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    part_replacement_t *replacement;
+    list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
+        if(replacement->u.multiboot.part && !strcmp(replacement->u.multiboot.part->name, name)) {
+            return replacement;
+        }
+    }
+    return NULL;
 }

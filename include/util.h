@@ -72,5 +72,9 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size);
 int util_setup_partition_replacements(void);
 int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint);
 int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint);
+char* util_get_property(const char* filename, const char* propertyname);
+int util_read_int(const char* filename, uint32_t* pvalue);
+int util_write_int(char const* path, int value);
+part_replacement_t* util_get_replacement_by_name(const char* name);
 
 #endif

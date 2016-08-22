@@ -26,6 +26,8 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 
+#define ANYEQ_2(var, val1, val2) ((var)==(val1) || (var)==(val2))
+
 #define PAYLOAD_IMPORT(name) \
     extern int _binary_##name##_start; \
     extern int _binary_##name##_end; \
@@ -44,6 +46,8 @@
 #define MBPATH_BOOTDEV MBPATH_ROOT "/bootdev"
 #define MBPATH_STUB MBPATH_ROOT "/stub"
 #define MBPATH_DATA MBPATH_ROOT "/data"
+#define MBPATH_MB_SYSTEM MBPATH_ROOT "/mb_system"
+#define MBPATH_MB_DATA MBPATH_ROOT "/mb_data"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
 #define MBPATH_TRIGGER_POSTFS_DATA MBPATH_BIN "/trigger-postfs-data"
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
@@ -91,6 +95,10 @@ typedef struct {
     // partition replacement list
     list_node_t replacements;
 
+    // datamedia
+    uint32_t native_data_layout_version;
+    const char* datamedia_source;
+    const char* datamedia_target;
 } multiboot_data_t;
 
 typedef struct {

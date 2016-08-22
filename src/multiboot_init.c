@@ -263,6 +263,13 @@ static int selinux_fixup(void) {
         // this is for the datamedia bind-mount
         util_sepolicy_inject("init", "media_rw_data_file", "dir", "mounton");
         util_sepolicy_inject("init", "block_device", "lnk_file", "setattr");
+
+        // just in case we changed/created it
+        util_append_string_to_file("/init.rc", "\n\n"
+                                   "on post-fs-data\n"
+                                   "    restorecon /data/.layout_version\n"
+                                   "\n"
+                                   );
     }
 
     // give our files selinux contexts
@@ -595,6 +602,14 @@ int multiboot_main(UNUSED int argc, char** argv) {
         if(rc) {
             MBABORT("Can't mount data: %s\n", strerror(errno));
         }
+
+        // get data layout version
+        uint32_t layout_version;
+        rc = util_read_int(MBPATH_DATA"/.layout_version", &layout_version);
+        if(!rc) {
+            multiboot_data.native_data_layout_version = layout_version;
+        }
+        LOGI("layout_version: %u\n", multiboot_data.native_data_layout_version);
 
         // scan mounts
         mounts_state_t mounts_state = {0};
