@@ -247,7 +247,7 @@ static int selinux_fixup(void) {
     util_sepolicy_inject("kernel", "init", "file", "read,open");
     util_sepolicy_inject("kernel", "init", "process", "signal");
     util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
-    util_sepolicy_inject("kernel", "block_device", "blk_file", "create,unlink");
+    util_sepolicy_inject("kernel", "block_device", "blk_file", "create,unlink,getattr,write");
     util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
     util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
     util_sepolicy_inject("kernel", "cache_block_device", "blk_file", "unlink");
@@ -269,6 +269,7 @@ static int selinux_fixup(void) {
     util_sepolicy_inject("init", "block_device", "dir", "relabelto");
     util_sepolicy_inject("init", "tmpfs", "blk_file", "getattr");
     util_sepolicy_inject("init", "tmpfs", "blk_file", "relabelfrom");
+    util_sepolicy_inject("init", "device", "dir", "relabelto");
 
     if(multiboot_data.is_multiboot) {
         // the loop images are not labeled
