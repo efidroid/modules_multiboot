@@ -120,7 +120,6 @@ int multiboot_exec_tracee(char** par) {
     register_syscall(dup2);
     register_syscall(dup);
     register_syscall(mount);
-    register_syscall(umount2);
     register_syscall(fcntl);
     register_syscall(fcntl64);
 

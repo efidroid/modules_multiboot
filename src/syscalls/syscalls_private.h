@@ -57,6 +57,5 @@ asmlinkage long sys_fcntl64(syshook_process_t* process, unsigned int fd, unsigne
 asmlinkage long sys_mount(syshook_process_t* process, char __user *dev_name, char __user *dir_name,
 				char __user *type, unsigned long flags,
 				void __user *data);
-asmlinkage long sys_umount2(syshook_process_t* process, char __user *name, int flags);
 
 #endif // SYSCALLS_PRIVATE_H

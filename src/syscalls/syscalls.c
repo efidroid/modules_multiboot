@@ -155,7 +155,6 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
     size_t udevname_len = 0;
     char kdirname[PATH_MAX];
     char kdevname[PATH_MAX];
-    char buf[PATH_MAX];
     int rc;
     long ret;
     part_replacement_t *replacement = NULL;
@@ -189,39 +188,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         // mount directly
         ret = mount(replacement->u.multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
         LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->u.multiboot.partpath, kdirname, (int)ret);
-        if(ret) return ret;
-
-        // mount datamedia
-        if(!strcmp(replacement->u.multiboot.part->name, "data")) {
-            LOGV("bind mount datamedia for: %s %s\n", kdevname, kdirname);
-
-            // build target dir path
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kdirname);
-
-            // create source dir
-            if(!util_exists(MBPATH_DATA"/media", false)) {
-                rc = util_mkdir(MBPATH_DATA"/media");
-                if(rc) {
-                    MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
-                }
-            }
-
-            // create target dir
-            if(!util_exists(buf, false)) {
-                rc = util_mkdir(buf);
-                if(rc) {
-                    MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
-                }
-            }
-
-            // bind mount
-            rc = mount(MBPATH_DATA"/media", buf, NULL, MS_BIND, NULL);
-            if(rc) {
-                MBABORT("Can't bind mount datamedia: %s\n", strerror(errno));
-            }
-        }
-
-        return 0;
+        return ret;
     }
 
     // loop
@@ -248,44 +215,4 @@ continue_syscall:
     }
 
     return ret;
-}
-
-SYSCALL_DEFINE2(umount2, char __user *, name, UNUSED int, flags)
-{
-    char kname[PATH_MAX];
-    char buf[PATH_MAX];
-    int rc;
-    mounts_state_t mounts_state = {0};
-
-    if(!syshook_multiboot_data->is_multiboot)
-        goto continue_syscall;
-
-    // copy name to our space
-    kname[0] = 0;
-    syshook_strncpy_user(process, kname, name, sizeof(kname));
-
-    // unmount datamedia
-    if(!strcmp(kname, "/data")) {
-        // scan mounted volumes
-        rc = scan_mounted_volumes(&mounts_state);
-        if(rc) {
-            MBABORT("Can't scan mounted volumes: %s\n", strerror(errno));
-        }
-
-        // build target dir path
-        SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/media", kname);
-
-        // check if datamedia is mounted at this path
-        const mounted_volume_t* volume = find_mounted_volume_by_mount_point(&mounts_state, buf);
-        if(volume) {
-            LOGV("unmount datamedia for %s\n", kname);
-            SAFE_UMOUNT(buf);
-        }
-
-        // free mount state
-        free_mounts_state(&mounts_state);
-    }
-
-continue_syscall:
-    return syshook_invoke_hookee(process);
 }
