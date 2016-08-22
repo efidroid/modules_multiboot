@@ -23,7 +23,7 @@
     int safe_snprintf_rc = snprintf((s), (n), (fmt), ##__VA_ARGS__); \
     if(safe_snprintf_rc<0 || (size_t)safe_snprintf_rc >=(n)) { \
         fn("snprintf error\n"); \
-        return (rc); \
+        return rc; \
     } \
 }while(0)
 
