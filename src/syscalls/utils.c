@@ -412,7 +412,7 @@ int syshook_handle_fd_close(fdinfo_t* fdinfo) {
     }
 
     pthread_mutex_lock(&replacement->lock);
-    if(syshook_multiboot_data->is_multiboot) {
+    if(syshook_multiboot_data->is_multiboot && replacement->u.multiboot.part) {
         rc = syshookutil_handle_close_multiboot(replacement);
     }
     else {
