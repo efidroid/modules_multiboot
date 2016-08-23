@@ -162,6 +162,10 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
     if(!syshook_multiboot_data->is_multiboot)
         goto continue_syscall;
 
+    // ignore NULL devs and remounts
+    if(!dev_name || flags&MS_REMOUNT)
+        goto continue_syscall;
+
     // copy dev_name to our space
     kdevname[0] = 0;
     syshook_strncpy_user(process, kdevname, dev_name, sizeof(kdevname));
