@@ -29,15 +29,18 @@
 static int klog_fd = -1;
 static int klog_level = KLOG_DEFAULT_LEVEL;
 
-int klog_get_fd(void) {
+int klog_get_fd(void)
+{
     return klog_fd;
 }
 
-int klog_get_level(void) {
+int klog_get_level(void)
+{
     return klog_level;
 }
 
-void klog_set_level(int level) {
+void klog_set_level(int level)
+{
     klog_level = level;
 }
 
@@ -48,20 +51,20 @@ void klog_init(void)
 
     if (klog_fd >= 0) return; /* Already initialized */
 
-    if(mknod(name, S_IFCHR | 0600, (1 << 8) | 11) != 0) {
+    if (mknod(name, S_IFCHR | 0600, (1 << 8) | 11) != 0) {
         name = MBPATH_DEV"/__kmsg__";
-        if(mknod(name, S_IFCHR | 0600, (1 << 8) | 11) != 0) {
+        if (mknod(name, S_IFCHR | 0600, (1 << 8) | 11) != 0) {
             name = "/dev/kmsg";
-            if(!util_exists(name, 1)) return;
+            if (!util_exists(name, 1)) return;
             do_unlink = 0;
         }
     }
 
     klog_fd = open(name, O_WRONLY);
     if (klog_fd < 0)
-            return;
+        return;
     fcntl(klog_fd, F_SETFD, FD_CLOEXEC);
-    if(do_unlink)
+    if (do_unlink)
         unlink(name);
 
     // redirect stdout and stderr to kmsg

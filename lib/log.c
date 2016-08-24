@@ -25,16 +25,19 @@
 
 static int log_level = LOG_DEFAULT_LEVEL;
 
-int log_get_level(void) {
+int log_get_level(void)
+{
     return log_level;
 }
 
-void log_set_level(int level) {
+void log_set_level(int level)
+{
     log_level = level;
 }
 
 
-void log_init(void) {
+void log_init(void)
+{
     klog_init();
     klog_set_level(KLOG_DEBUG_LEVEL);
 }
@@ -47,11 +50,12 @@ void log_vwrite(int level, const char *fmt, va_list ap)
     vfprintf(stderr, fmt, ap);
 }
 
-static void sim_kpan(void) {
+static void sim_kpan(void)
+{
     int fd = open(MBPATH_PROC"/sysrq-trigger", O_WRONLY);
-    if(fd<0) {
+    if (fd<0) {
         fd = open("/proc/sysrq-trigger", O_WRONLY);
-        if(fd<0) return;
+        if (fd<0) return;
     }
 
     char c = 'c';
@@ -67,7 +71,7 @@ void log_write(int level, const char *fmt, ...)
     log_vwrite(level, fmt, ap);
     va_end(ap);
 
-    if(level==LOGF_LEVEL) {
+    if (level==LOGF_LEVEL) {
         // try to reboot
         android_reboot(ANDROID_RB_RESTART, 0, 0);
 
@@ -79,6 +83,6 @@ void log_write(int level, const char *fmt, ...)
         exit(1);
 
         // never return
-        for(;;);
+        for (;;);
     }
 }

@@ -63,7 +63,7 @@ static uevent_block_t *get_blockinfo_by_filename(list_node_t *info, const char *
 {
     uevent_block_t *event;
     list_for_every_entry(info, event, uevent_block_t, node) {
-        if(!strcmp(event->filename, filename))
+        if (!strcmp(event->filename, filename))
             return event;
     }
 
@@ -83,7 +83,7 @@ static int add_uevent_entry(list_node_t *info, const char *filename)
     }
 
     // allocate memory
-    uevent_block_t* entry = safe_calloc(1, sizeof(uevent_block_t));
+    uevent_block_t *entry = safe_calloc(1, sizeof(uevent_block_t));
     entry->filename = safe_strdup(filename);
 
     // parse file
@@ -117,14 +117,14 @@ static int add_uevent_entry(list_node_t *info, const char *filename)
     list_add_tail(info, &entry->node);
 
     // close file
-    if(fclose(fp)) {
+    if (fclose(fp)) {
         LOGW("Can't close %s: %s\n", filename, strerror(errno));
     }
 
     return 0;
 }
 
-static int get_block_devices_internal(list_node_t* info, int rescan)
+static int get_block_devices_internal(list_node_t *info, int rescan)
 {
     const char *path = UEVENT_PATH_BLOCK_DEVICES;
     char buf[PATH_MAX];
@@ -144,7 +144,7 @@ static int get_block_devices_internal(list_node_t* info, int rescan)
         SAFE_SNPRINTF_RET(LOGE, -1, buf, ARRAY_SIZE(buf), "%s/%s/uevent", path, dt->d_name);
 
         // skip if this is a rescan and the item does already exist
-        if(rescan && get_blockinfo_by_filename(info, buf))
+        if (rescan && get_blockinfo_by_filename(info, buf))
             continue;
 
         add_uevent_entry(info, buf);
@@ -163,7 +163,7 @@ list_node_t *get_block_devices(void)
     list_initialize(info);
 
     int rc = get_block_devices_internal(info, 0);
-    if(rc) {
+    if (rc) {
         free(info);
         return NULL;
     }
@@ -171,15 +171,15 @@ list_node_t *get_block_devices(void)
     return info;
 }
 
-void add_new_block_devices(list_node_t* info)
+void add_new_block_devices(list_node_t *info)
 {
     get_block_devices_internal(info, 1);
 }
 
 void free_block_devices(list_node_t *info)
 {
-    while(!list_is_empty(info)) {
-        uevent_block_t* event = list_peek_tail_type(info, uevent_block_t, node);
+    while (!list_is_empty(info)) {
+        uevent_block_t *event = list_peek_tail_type(info, uevent_block_t, node);
 
         if (event->devname)
             free(event->devname);
@@ -195,22 +195,22 @@ uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path)
 {
     char *search_name = NULL;
     bool use_name = false;
-    const char* search_devname = NULL;
+    const char *search_devname = NULL;
     uevent_block_t *ret = NULL;
 
     int mbpath_len = strlen(MBPATH_ROOT);
-    if(!strncmp(path, MBPATH_ROOT, mbpath_len))
+    if (!strncmp(path, MBPATH_ROOT, mbpath_len))
         path+=mbpath_len;
 
     if (strstr(path, "by-name") != NULL) {
         search_name = util_basename(path);
-        if(!search_name) {
+        if (!search_name) {
             return NULL;
         }
         use_name = true;
     } else {
-        const char* prefix = "/dev/block/";
-        if(strncmp(path, prefix, strlen(prefix))) {
+        const char *prefix = "/dev/block/";
+        if (strncmp(path, prefix, strlen(prefix))) {
             return NULL;
         }
 
@@ -222,8 +222,7 @@ uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path)
         if (use_name && event->partname && !strcmp(event->partname, search_name)) {
             ret = event;
             break;
-        }
-        else if (!use_name && event->devname && !strcmp(event->devname, search_devname)) {
+        } else if (!use_name && event->devname && !strcmp(event->devname, search_devname)) {
             ret = event;
             break;
         }
@@ -279,9 +278,9 @@ int uevent_create_nodes(list_node_t *info, const char *path)
     SAFE_SNPRINTF_RET(LOGE, -1, path_block, sizeof(path_block), "%s/block", path);
 
     // create block directory
-    if(!util_exists(path_block, 1)) {
+    if (!util_exists(path_block, 1)) {
         rc = util_mkdir(path_block);
-        if(rc<0) {
+        if (rc<0) {
             return rc;
         }
     }
@@ -294,7 +293,7 @@ int uevent_create_nodes(list_node_t *info, const char *path)
 
         // create node
         rc = mknod(buf, S_IFBLK | 0600, makedev(bi->major, bi->minor));
-        if(rc<0 && errno!=EEXIST) {
+        if (rc<0 && errno!=EEXIST) {
             return rc;
         }
     }
@@ -303,7 +302,7 @@ int uevent_create_nodes(list_node_t *info, const char *path)
 
     // create devzero node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 5));
-    if(rc<0 && errno!=EEXIST) {
+    if (rc<0 && errno!=EEXIST) {
         return rc;
     }
 
@@ -312,7 +311,7 @@ int uevent_create_nodes(list_node_t *info, const char *path)
 
     // create devnull node
     rc = mknod(buf, S_IFCHR | 0666, makedev(1, 3));
-    if(rc<0 && errno!=EEXIST) {
+    if (rc<0 && errno!=EEXIST) {
         return rc;
     }
 

@@ -60,57 +60,59 @@ typedef struct {
 
 typedef struct {
     // device for writing
-    void* buf;
+    void *buf;
     uint32_t bufsize;
     bool found;
 
     // backup data in case the variable exists
-    uint16_t* name;
+    uint16_t *name;
     uint32_t namesize;
-    const void* data;
+    const void *data;
     uint32_t datasize;
     efi_guid_t guid;
     uint32_t attributes;
 } efivar_pdata_t;
 
 typedef unsigned long addr_t;
-typedef int (*efivar_callback_t)(void* pdata, const uint16_t* name, const uint32_t namesize, const void* data,
+typedef int (*efivar_callback_t)(void *pdata, const uint16_t *name, const uint32_t namesize, const void *data,
                                  const uint32_t datasize, efi_guid_t guid, uint32_t attributes);
 
-static int copy_ansi2unicodestr(uint16_t** outdst, const char* src, size_t* outsz) {
-    uint16_t* dst = NULL;
+static int copy_ansi2unicodestr(uint16_t **outdst, const char *src, size_t *outsz)
+{
+    uint16_t *dst = NULL;
     size_t sz = (strlen(src)+1)*sizeof(uint16_t);
 
     *outdst = dst = malloc(sz);
-    if(!dst) return (int)dst;
+    if (!dst) return (int)dst;
 
-    while(*src) {
+    while (*src) {
         *(dst++) = *(src++);
     }
     *dst = 0;
 
-    if(outsz)
+    if (outsz)
         *outsz = sz;
 
     return 0;
 }
 
-static char* efivar_getdev(void) {
+static char *efivar_getdev(void)
+{
     // check if blockinfo is available
-    multiboot_data_t* mbdata = multiboot_get_data();
-    if(!mbdata || !mbdata->blockinfo) goto err;
+    multiboot_data_t *mbdata = multiboot_get_data();
+    if (!mbdata || !mbdata->blockinfo) goto err;
 
     // get block of our partition
-    uevent_block_t* bi = get_blockinfo_for_path(mbdata->blockinfo, DEVICE_NVVARS_PARTITION);
-    if(!bi) goto err;
+    uevent_block_t *bi = get_blockinfo_for_path(mbdata->blockinfo, DEVICE_NVVARS_PARTITION);
+    if (!bi) goto err;
 
     // try EFIVARDEV
-    if(util_exists(EFIVARDEV, true)) {
+    if (util_exists(EFIVARDEV, true)) {
         return strdup(EFIVARDEV);
     }
 
     // try to create /efivardev
-    if(!mknod(EFIVARDEV, S_IRUSR | S_IWUSR | S_IFBLK, makedev(bi->major, bi->minor))) {
+    if (!mknod(EFIVARDEV, S_IRUSR | S_IWUSR | S_IFBLK, makedev(bi->major, bi->minor))) {
         return strdup(EFIVARDEV);
     }
 
@@ -121,24 +123,25 @@ err:
     return strdup(DEVICE_NVVARS_PARTITION);
 }
 
-static int efivar_read_to_buf(const char* device, void** buf, uint32_t* outdatasize) {
+static int efivar_read_to_buf(const char *device, void **buf, uint32_t *outdatasize)
+{
     off_t off;
     int fd;
     ssize_t nbytes;
     int rc = 0;
     efivar_hdr_t hdr;
-    uint8_t* data = NULL;
+    uint8_t *data = NULL;
 
     // open device
     fd = open(device, O_RDONLY);
-    if(fd<0) {
+    if (fd<0) {
         LOGE("can't open %s: %s\n", device, strerror(-fd));
         return fd;
     }
 
     // seek to start of the NVVARS data
     off = lseek(fd, -0x10000, SEEK_END);
-    if(off<0) {
+    if (off<0) {
         perror("seek failed");
         rc = (int)fd;
         goto err_close;
@@ -146,33 +149,33 @@ static int efivar_read_to_buf(const char* device, void** buf, uint32_t* outdatas
 
     // read header
     nbytes = read(fd, &hdr, sizeof(hdr));
-    if(nbytes!=sizeof(hdr)) {
+    if (nbytes!=sizeof(hdr)) {
         perror("reading header failed");
         rc = (int)nbytes;
         goto err_close;
     }
 
     // check magic
-    if(hdr.magic!=EFIVAR_MAGIC) {
+    if (hdr.magic!=EFIVAR_MAGIC) {
         LOGE("Invalid magic\n");
         rc = EINVAL;
         goto err_close;
     }
 
-    if(outdatasize)
+    if (outdatasize)
         *outdatasize = hdr.data_size;
 
-    if(buf) {
+    if (buf) {
         // allocate memory for data
         data = malloc(hdr.data_size);
-        if(!data) {
+        if (!data) {
             LOGE("allocating data failed\n");
             goto err_close;
         }
 
         // read whole data area into memory
         nbytes = read(fd, data, hdr.data_size);
-        if(nbytes!=(ssize_t)hdr.data_size) {
+        if (nbytes!=(ssize_t)hdr.data_size) {
             perror("reading data failed");
             rc = (int)nbytes;
             goto err_free;
@@ -180,7 +183,7 @@ static int efivar_read_to_buf(const char* device, void** buf, uint32_t* outdatas
 
         // verify CRC32
         uint32_t crc32sum = cksum_crc32(0, data, hdr.data_size);
-        if(hdr.crc32!=crc32sum) {
+        if (hdr.crc32!=crc32sum) {
             LOGE("Invalid checksum\n");
             rc = -EIO;
             goto err_free;
@@ -200,7 +203,8 @@ err_close:
     return rc;
 }
 
-static int efivar_write_from_buf(const char* device, void* data, uint32_t datasize) {
+static int efivar_write_from_buf(const char *device, void *data, uint32_t datasize)
+{
     off_t off;
     int fd;
     size_t nbytes;
@@ -208,14 +212,14 @@ static int efivar_write_from_buf(const char* device, void* data, uint32_t datasi
 
     // open device
     fd = open(device, O_WRONLY);
-    if(fd<0) {
+    if (fd<0) {
         LOGE("can't open %s\n", device);
         return fd;
     }
 
     // seek to start of the NVVARS data
     off = lseek(fd, -0x10000, SEEK_END);
-    if(off<0) {
+    if (off<0) {
         perror("seek failed");
         rc = (int)fd;
         goto err_close;
@@ -223,7 +227,7 @@ static int efivar_write_from_buf(const char* device, void* data, uint32_t datasi
 
     // write data
     nbytes = write(fd, data, datasize);
-    if(nbytes!=datasize) {
+    if (nbytes!=datasize) {
         perror("write failed");
         rc = (int)nbytes;
         goto err_close;
@@ -235,23 +239,24 @@ err_close:
     return rc;
 }
 
-static int efivar_iterate(const void* buf, uint32_t bufsize, efivar_callback_t cb, void* pdata) {
+static int efivar_iterate(const void *buf, uint32_t bufsize, efivar_callback_t cb, void *pdata)
+{
     int rc = 0;
 
     uint32_t namesize;
-    const uint8_t* dataptr = buf;
+    const uint8_t *dataptr = buf;
     do {
-        const uint16_t* name;
+        const uint16_t *name;
         efi_guid_t guid;
         uint32_t attributes;
         uint32_t datasize;
-        const uint8_t* data;
+        const uint8_t *data;
 
         // get namesize
         memcpy(&namesize, dataptr, sizeof(namesize));
         dataptr+=sizeof(uint32_t);
         // get name
-        name = (uint16_t*)dataptr;
+        name = (uint16_t *)dataptr;
         dataptr+=ALIGN(namesize, sizeof(uint32_t));
 
         // get guid
@@ -271,17 +276,17 @@ static int efivar_iterate(const void* buf, uint32_t bufsize, efivar_callback_t c
         dataptr+=ALIGN(datasize, sizeof(uint32_t));
 
         rc=cb(pdata, name, namesize, data, datasize, guid, attributes);
-        if(rc) break;
+        if (rc) break;
 
-    } while(namesize>0 && (uint32_t)(dataptr-(uint8_t*)buf)<bufsize);
+    } while (namesize>0 && (uint32_t)(dataptr-(uint8_t *)buf)<bufsize);
 
     return rc;
 }
 
-static int efivar_append(void** buf, const uint16_t* name, const uint32_t namesize, const void* data,
+static int efivar_append(void **buf, const uint16_t *name, const uint32_t namesize, const void *data,
                          const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
 {
-    uint8_t* bufptr = *buf;
+    uint8_t *bufptr = *buf;
 
     // copy namesize
     memcpy(bufptr, &namesize, sizeof(namesize));
@@ -312,16 +317,15 @@ static int efivar_append(void** buf, const uint16_t* name, const uint32_t namesi
     return 0;
 }
 
-static int efivar_setvar_cb(void* _pdata, const uint16_t* name, const uint32_t namesize, const void* data,
+static int efivar_setvar_cb(void *_pdata, const uint16_t *name, const uint32_t namesize, const void *data,
                             const uint32_t datasize, efi_guid_t guid, uint32_t attributes)
 {
-    efivar_pdata_t* pdata = _pdata;
+    efivar_pdata_t *pdata = _pdata;
 
-    if(pdata->namesize==namesize && !memcmp(pdata->name, name, namesize) &&
-            !memcmp(&pdata->guid, &guid, sizeof(guid)))
-    {
+    if (pdata->namesize==namesize && !memcmp(pdata->name, name, namesize) &&
+            !memcmp(&pdata->guid, &guid, sizeof(guid))) {
         free(pdata->name);
-        pdata->name = (uint16_t*)name;
+        pdata->name = (uint16_t *)name;
         pdata->namesize = namesize;
         pdata->data = data;
         pdata->datasize = datasize;
@@ -333,16 +337,16 @@ static int efivar_setvar_cb(void* _pdata, const uint16_t* name, const uint32_t n
         return 0;
     }
 
-    if(pdata->buf)
+    if (pdata->buf)
         return efivar_append(&pdata->buf, name, namesize, data, datasize, guid, attributes);
 
     return 0;
 }
 
-int efivar_get(const char* name, efi_guid_t* guid,
-               uint32_t* attributes, uint32_t* datasize, void* data)
+int efivar_get(const char *name, efi_guid_t *guid,
+               uint32_t *attributes, uint32_t *datasize, void *data)
 {
-    void* rawdata = NULL;
+    void *rawdata = NULL;
     uint32_t rawdatasize = 0;
     int rc = 0;
     efivar_pdata_t pdata;
@@ -351,7 +355,7 @@ int efivar_get(const char* name, efi_guid_t* guid,
 
     // read variable data into buffer
     rc = efivar_read_to_buf(efivar_getdev(), &rawdata, &rawdatasize);
-    if(rc || !rawdata) {
+    if (rc || !rawdata) {
         LOGE("Error reading variable into buffer\n");
         return rc;
     }
@@ -361,19 +365,18 @@ int efivar_get(const char* name, efi_guid_t* guid,
     pdata.guid = *guid;
     efivar_iterate(rawdata, rawdatasize, efivar_setvar_cb, &pdata);
 
-    if(pdata.found) {
+    if (pdata.found) {
         // return variables
 
-        if(data && *datasize>=pdata.datasize)
+        if (data && *datasize>=pdata.datasize)
             memcpy(data, pdata.data, pdata.datasize);
         else rc = -ENOMEM;
 
-        if(attributes)
+        if (attributes)
             *attributes = pdata.attributes;
 
         *datasize = pdata.datasize;
-    }
-    else {
+    } else {
         free(pdata.name);
         rc = -ENOENT;
     }
@@ -381,10 +384,10 @@ int efivar_get(const char* name, efi_guid_t* guid,
     return rc;
 }
 
-int efivar_set(const char* name, efi_guid_t* guid,
-               uint32_t attributes, uint32_t datasize, const void* data)
+int efivar_set(const char *name, efi_guid_t *guid,
+               uint32_t attributes, uint32_t datasize, const void *data)
 {
-    void* rawdata = NULL;
+    void *rawdata = NULL;
     uint32_t rawdatasize = 0;
     int rc = 0;
     efivar_pdata_t pdata;
@@ -393,19 +396,19 @@ int efivar_set(const char* name, efi_guid_t* guid,
 
     // read variable data into buffer
     rc = efivar_read_to_buf(efivar_getdev(), &rawdata, &rawdatasize);
-    if(rc || !rawdata) {
+    if (rc || !rawdata) {
         LOGE("Error reading variable into buffer\n");
         return rc;
     }
 
     // allocate new buffer
-    void* newdata = calloc(
+    void *newdata = calloc(
                         sizeof(efivar_hdr_t) +
                         rawdatasize +
                         EFIVAR_ENTRY_SIZE(name, datasize),
                         1
                     );
-    if(!newdata) {
+    if (!newdata) {
         LOGE("Error allocating new buffer\n");
         return rc;
     }
@@ -416,7 +419,7 @@ int efivar_set(const char* name, efi_guid_t* guid,
     pdata.guid = *guid;
     efivar_iterate(rawdata, rawdatasize, efivar_setvar_cb, &pdata);
 
-    if(attributes && datasize) {
+    if (attributes && datasize) {
         // append the new/changed variable
         copy_ansi2unicodestr(&pdata.name, name, &pdata.namesize);
         pdata.data = data;
@@ -427,7 +430,7 @@ int efivar_set(const char* name, efi_guid_t* guid,
     }
 
     uint32_t newdatasize = pdata.buf - (newdata + 3*sizeof(uint32_t));
-    uint32_t* newdata32 = newdata;
+    uint32_t *newdata32 = newdata;
     newdata32[0] = EFIVAR_MAGIC;
     newdata32[1] = newdatasize;
     newdata32[2] = cksum_crc32(0, newdata + 3*sizeof(uint32_t), newdatasize);
@@ -439,31 +442,37 @@ int efivar_set(const char* name, efi_guid_t* guid,
     return rc;
 }
 
-int efivar_get_global(const char* name, uint32_t* datasize, void* data) {
+int efivar_get_global(const char *name, uint32_t *datasize, void *data)
+{
     efi_guid_t guid = EFI_GLOBAL_VARIABLE;
     return efivar_get(name, &guid, NULL, datasize, data);
 }
 
-int efivar_set_global(const char* name, uint32_t datasize, const void* data) {
+int efivar_set_global(const char *name, uint32_t datasize, const void *data)
+{
     efi_guid_t guid = EFI_GLOBAL_VARIABLE;
     return efivar_set(name, &guid, EFI_VARIABLE_DEFAULT_ATTRIBUTES, datasize, data);
 }
 
-int efivar_get_efidroid(const char* name, uint32_t* datasize, void* data) {
+int efivar_get_efidroid(const char *name, uint32_t *datasize, void *data)
+{
     efi_guid_t guid = EFI_EFIDROID_VARIABLE;
     return efivar_get(name, &guid, NULL, datasize, data);
 }
 
-int efivar_set_efidroid(const char* name, uint32_t datasize, const void* data) {
+int efivar_set_efidroid(const char *name, uint32_t datasize, const void *data)
+{
     efi_guid_t guid = EFI_EFIDROID_VARIABLE;
     return efivar_set(name, &guid, EFI_VARIABLE_DEFAULT_ATTRIBUTES, datasize, data);
 }
 
-int efivars_report_error(const char* error) {
+int efivars_report_error(const char *error)
+{
     return efivar_set_efidroid("EFIDroidErrorStr", strlen(error)+1, error);
 }
 
-int efivars_set_error(const char *fmt, ...) {
+int efivars_set_error(const char *fmt, ...)
+{
     int n;
     int size = 100;
     char *p, *np;
