@@ -233,7 +233,7 @@ int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int
 int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor) {
     int rc;
     const mounted_volume_t* volume;
-    mounts_state_t mounts_state = {0};
+    mounts_state_t mounts_state = LIST_INITIAL_VALUE(mounts_state);
 
     rc = scan_mounted_volumes(&mounts_state);
     if(rc) {
@@ -260,7 +260,7 @@ int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* mi
 static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     int rc;
     const char* mountpoint = NULL;
-    mounts_state_t mounts_state = {0};
+    mounts_state_t mounts_state = LIST_INITIAL_VALUE(mounts_state);
 
     if(replacement) {
         LOGI("%s has changed. syncing ESP replacement\n", replacement->loopdevice);

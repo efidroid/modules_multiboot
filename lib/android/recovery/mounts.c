@@ -14,217 +14,101 @@
  * limitations under the License.
  */
 
+#include <lib/mntentex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/mount.h>
-#include <unistd.h>
 #include <limits.h>
 
 #include <lib/mounts.h>
-
 #include <common.h>
 
-#define LOG_TAG "MOUNTS"
-#include <lib/log.h>
-
 static inline void
-free_volume_internals(const mounted_volume_t *volume, int zero)
+free_volume_internals(const mounted_volume_t *volume)
 {
+    free((char *)volume->device);
     free((char *)volume->mount_root);
     free((char *)volume->mount_point);
-    free((char *)volume->flags);
     free((char *)volume->filesystem);
-    free((char *)volume->device);
-    free((char *)volume->fsflags);
-    if (zero) {
-        memset((void *)volume, 0, sizeof(*volume));
-    }
+    free((char *)volume->flags);
+    free((mounted_volume_t *)volume);
 }
 
-void
-free_mounts_state(mounts_state_t* mounts_states)
+void free_mounts_state(mounts_state_t *mounts_state)
 {
-    int i;
-    for (i = 0; i < mounts_states->volume_count; i++) {
-        free_volume_internals(&mounts_states->volumes[i], 1);
+    while (!list_is_empty(mounts_state)) {
+        mounted_volume_t *volume = list_remove_tail_type(mounts_state, mounted_volume_t, node);
+        free_volume_internals(volume);
     }
-
-    memset(mounts_states, 0, sizeof(*mounts_states));
 }
 
-#define PROC_MOUNTS_FILENAME   "/proc/1/mountinfo"
-#define MBPROC_MOUNTS_FILENAME MBPATH_PROC"/1/mountinfo"
-#define PROC_MOUNTS_BUFSIZE 4096
+#define PROC_MOUNTS_FILENAME   MBPATH_PROC"/1/mountinfo"
+
 int
-scan_mounted_volumes(mounts_state_t* mounts_states)
+scan_mounted_volumes(mounts_state_t *mounts_state)
 {
-    char *buf = NULL;
-    const char *bufp;
-    int fd;
-    ssize_t nbytes;
+    FILE *fp;
+    mntentex_t *mentry;
+    mntentex_t buf_mntent;
+    char buf_mntstr[PATH_MAX];
 
-    if (mounts_states->volumes == NULL) {
-        const int numv = 32;
-        mounted_volume_t *volumes = malloc(numv * sizeof(*volumes));
-        if (volumes == NULL) {
-            errno = ENOMEM;
-            return -1;
-        }
-        mounts_states->volumes = volumes;
-        mounts_states->volumes_allocd = numv;
-        memset(volumes, 0, numv * sizeof(*volumes));
-    } else {
-        /* Free the old volume strings.
-         */
-        int i;
-        for (i = 0; i < mounts_states->volume_count; i++) {
-            free_volume_internals(&mounts_states->volumes[i], 1);
-        }
-    }
-    mounts_states->volume_count = 0;
-
-    buf = calloc(PROC_MOUNTS_BUFSIZE, 1);
-    if(!buf) {
-        goto bail;
-    }
-
-    /* Open and read the file contents.
+    /* Free the old volume state.
      */
-    fd = open(PROC_MOUNTS_FILENAME, O_RDONLY);
-    if (fd < 0) {
-        fd = open(MBPROC_MOUNTS_FILENAME, O_RDONLY);
+    free_mounts_state(mounts_state);
+
+    /* Open and read mount table entries. */
+    fp = setmntentex(PROC_MOUNTS_FILENAME, "r");
+    if (fp == NULL) {
+        return -1;
     }
-    if (fd < 0) {
-        goto bail;
+    while ((mentry = getmntentex(fp, &buf_mntent, buf_mntstr, sizeof(buf_mntstr))) != NULL) {
+        mounted_volume_t *v = safe_calloc(1, sizeof(mounted_volume_t));
+        v->id = mentry->mnt_id;
+        v->parentid = mentry->mnt_pid;
+        v->major = mentry->mnt_major;
+        v->minor = mentry->mnt_minor;
+        v->device = safe_strdup(mentry->mnt_fsname);
+        v->mount_root = safe_strdup(mentry->mnt_root);
+        v->mount_point = safe_strdup(mentry->mnt_dir);
+        v->filesystem = safe_strdup(mentry->mnt_type);
+        v->flags = safe_strdup(mentry->mnt_opts);
+
+        list_add_tail(mounts_state, &v->node);
     }
-    nbytes = read(fd, buf, PROC_MOUNTS_BUFSIZE - 1);
-    close(fd);
-    if (nbytes < 0) {
-        goto bail;
-    }
-    buf[nbytes] = '\0';
-
-    /* Parse the contents of the file, which looks like:
-     *
-     *     # cat /proc/1/mountinfo
-     *     1 1 0:1 / / rw - rootfs rootfs rw,seclabel
-     *     12 11 0:9 / /dev/pts rw,relatime - devpts devpts rw,seclabel,mode=600
-     *     13 1 0:3 / /proc rw,relatime - proc proc rw
-     *     14 1 0:12 / /sys rw,relatime - sysfs sysfs rw,seclabel
-     *     22 1 179:23 / /system rw,relatime - ext4 /dev/block/mmcblk0p23 rw,seclabel,data=ordered
-     *     18 1 179:26 / /data rw,relatime - ext4 /dev/block/mmcblk0p26 rw,seclabel,data=ordered
-     *     21 1 179:27 / /sdcard rw,relatime - ext4 /dev/block/mmcblk0p27 rw,seclabel,data=ordered
-     */
-    bufp = buf;
-    while (nbytes > 0) {
-        int id, parentid;
-        unsigned major, minor;
-        char* mount_root = NULL;
-        char* mount_point = NULL;
-        char* flags = NULL;
-        char* filesystem = NULL;
-        char* device = NULL;
-        char* fsflags = NULL;
-        int matches;
-
-        /* %ms is a gnu extension that malloc()s a string for each field.
-         */
-        matches = sscanf(bufp, "%i %i %u:%u %ms %ms %ms",
-                &id, &parentid, &major, &minor, &mount_root, &mount_point, &flags);
-
-        if (matches != 7) {
-            LOGW("matches was %d on <<%.40s>>\n", matches, bufp);
-            goto ERR;
-        }
-
-        const char* bufp2 = strstr(bufp, " - ");
-        if(!bufp2) {
-            LOGW("' - ' not found in <<%.40s>>\n", bufp);
-            goto ERR;
-        }
-
-        matches = sscanf(bufp2, " - %ms %ms %ms", &filesystem, &device, &fsflags);
-        if (matches != 3) {
-            LOGW("matches was %d on <<%.40s>>\n", matches, bufp2);
-            goto ERR;
-        }
-
-        mounted_volume_t *v =
-                &mounts_states->volumes[mounts_states->volume_count++];
-        v->id = id;
-        v->parentid = parentid;
-        v->major = major;
-        v->minor = minor;
-        v->mount_root = mount_root;
-        v->mount_point = mount_point;
-        v->flags = flags;
-        v->filesystem = filesystem;
-        v->device = device;
-        v->fsflags = fsflags;
-        goto NEXT;
-
-ERR:
-        free(mount_root);
-        free(mount_point);
-        free(flags);
-        free(filesystem);
-        free(device);
-        free(fsflags);
-
-NEXT:
-        /* Eat the line.
-         */
-        while (nbytes > 0 && *bufp != '\n') {
-            bufp++;
-            nbytes--;
-        }
-        if (nbytes > 0) {
-            bufp++;
-            nbytes--;
-        }
-    }
-
+    endmntentex(fp);
     return 0;
-
-bail:
-    free(buf);
-
-//TODO: free the strings we've allocated.
-    mounts_states->volume_count = 0;
-    return -1;
 }
-
-void
-dump_mounted_volumes(mounts_state_t* mounts_states)
-{
-    if (mounts_states->volumes != NULL) {
-        int i;
-        for (i = 0; i < mounts_states->volume_count; i++) {
-            mounted_volume_t *v = &mounts_states->volumes[i];
-            LOGI("%i %i %u:%u %s %s %s - %s %s %s\n",
-                v->id, v->parentid, v->major, v->minor, v->mount_root, v->mount_point, v->flags, v->filesystem, v->device, v->fsflags);
-        }
-    }
-}
-
 
 const mounted_volume_t *
-find_mounted_volume_by_device(mounts_state_t* mounts_states, const char *device, int with_bindmounts)
+find_mounted_volume_by_device(mounts_state_t *mounts_state, const char *device)
 {
-    if (mounts_states->volumes != NULL) {
-        int i;
-        for (i = 0; i < mounts_states->volume_count; i++) {
-            mounted_volume_t *v = &mounts_states->volumes[i];
-            /* May be null if it was unmounted and we haven't rescanned.
-             */
-            if (v->device != NULL) {
-                if (strcmp(v->device, device) == 0) {
-                    if(with_bindmounts || !strcmp(v->mount_root, "/"))
-                        return v;
-                }
+    mounted_volume_t *v;
+    list_for_every_entry(mounts_state, v, mounted_volume_t, node) {
+        /* May be null if it was unmounted and we haven't rescanned.
+         */
+        if (v->device != NULL) {
+            if (strcmp(v->device, device) == 0) {
+                return v;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+const mounted_volume_t *
+find_mounted_volume_by_mount_point(mounts_state_t *mounts_state, const char *mount_point)
+{
+    mounted_volume_t *v;
+    list_for_every_entry(mounts_state, v, mounted_volume_t, node) {
+        /* May be null if it was unmounted and we haven't rescanned.
+         */
+        if (v->mount_point != NULL) {
+            if (strcmp(v->mount_point, mount_point) == 0) {
+                return v;
             }
         }
     }
@@ -232,37 +116,13 @@ find_mounted_volume_by_device(mounts_state_t* mounts_states, const char *device,
 }
 
 const mounted_volume_t *
-find_mounted_volume_by_mount_point(mounts_state_t* mounts_states, const char *mount_point)
+find_mounted_volume_by_majmin(mounts_state_t *mounts_state, unsigned major, unsigned minor, int with_bindmounts)
 {
-    if (mounts_states->volumes != NULL) {
-        int i;
-        for (i = 0; i < mounts_states->volume_count; i++) {
-            mounted_volume_t *v = &mounts_states->volumes[i];
-            /* May be null if it was unmounted and we haven't rescanned.
-             */
-            if (v->mount_point != NULL) {
-                if (strcmp(v->mount_point, mount_point) == 0) {
-                    return v;
-                }
-            }
-        }
-    }
-    return NULL;
-}
-
-const mounted_volume_t *
-find_mounted_volume_by_majmin(mounts_state_t* mounts_states, unsigned major, unsigned minor, int with_bindmounts)
-{
-    if (mounts_states->volumes != NULL) {
-        int i;
-        for (i = 0; i < mounts_states->volume_count; i++) {
-            mounted_volume_t *v = &mounts_states->volumes[i];
-            /* May be null if it was unmounted and we haven't rescanned.
-             */
-            if (v->major == major && v->minor == minor) {
-                if(with_bindmounts || !strcmp(v->mount_root, "/"))
-                    return v;
-            }
+    mounted_volume_t *v;
+    list_for_every_entry(mounts_state, v, mounted_volume_t, node) {
+        if (v->major == major && v->minor == minor) {
+            if (with_bindmounts || !strcmp(v->mount_root, "/"))
+                return v;
         }
     }
     return NULL;
@@ -277,29 +137,15 @@ unmount_mounted_volume(const mounted_volume_t *volume)
      */
     int ret = umount(volume->mount_point);
     if (ret == 0) {
-        free_volume_internals(volume, 1);
+        list_delete((list_node_t *)&volume->node);
+        free_volume_internals(volume);
         return 0;
     }
     return ret;
 }
 
 int
-unmount_mounted_volume_detach(const mounted_volume_t *volume)
-{
-    /* Intentionally pass NULL to umount if the caller tries
-     * to unmount a volume they already unmounted using this
-     * function.
-     */
-    int ret = umount2(volume->mount_point, MNT_DETACH);
-    if (ret == 0) {
-        free_volume_internals(volume, 1);
-        return 0;
-    }
-    return ret;
-}
-
-int
-remount_read_only(const mounted_volume_t* volume)
+remount_read_only(const mounted_volume_t *volume)
 {
     return mount(volume->device, volume->mount_point, volume->filesystem,
                  MS_NOATIME | MS_NODEV | MS_NODIRATIME |

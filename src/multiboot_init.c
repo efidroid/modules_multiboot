@@ -1118,7 +1118,7 @@ int multiboot_main(UNUSED int argc, char** argv) {
         LOGI("layout_version: %u\n", multiboot_data.native_data_layout_version);
 
         // scan mounts
-        mounts_state_t mounts_state = {0};
+        mounts_state_t mounts_state = LIST_INITIAL_VALUE(mounts_state);
         LOGV("scan mounted volumes\n");
         rc = scan_mounted_volumes(&mounts_state);
         if(rc) {

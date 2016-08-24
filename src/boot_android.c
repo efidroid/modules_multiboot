@@ -117,7 +117,7 @@ finish:
 
 static void handle_on_post_fs_data(void) {
     int rc;
-    mounts_state_t mounts_state = {0};
+    mounts_state_t mounts_state = LIST_INITIAL_VALUE(mounts_state);
 
     // scan mounted volumes
     rc = scan_mounted_volumes(&mounts_state);

@@ -63,6 +63,7 @@ add_executable(init
     lib/uevent.c
     lib/android/bionic/strlcpy.c
     lib/android/bionic/strlcat.c
+    lib/android/bionic/mntentex.c
     lib/android/cutils/klog.c
     lib/android/cutils/android_reboot.c
     lib/android/fs_mgr/fs_mgr.c

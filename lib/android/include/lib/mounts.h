@@ -21,39 +21,38 @@
 extern "C" {
 #endif
 
+#include <lib/list.h>
+
 typedef struct {
+    list_node_t node;
+
     int id;
     int parentid;
     unsigned major;
     unsigned minor;
+    const char *device;
     const char *mount_root;
     const char *mount_point;
-    const char *flags;
     const char *filesystem;
-    const char *device;
-    const char *fsflags;
+    const char *flags;
 } mounted_volume_t;
 
-typedef struct {
-    mounted_volume_t *volumes;
-    int volumes_allocd;
-    int volume_count;
-} mounts_state_t;
+typedef list_node_t mounts_state_t;
 
-void free_mounts_state(mounts_state_t* mounts_states);
+void free_mounts_state(mounts_state_t *mounts_state);
 
-int scan_mounted_volumes(mounts_state_t* mounts_states);
-void dump_mounted_volumes(mounts_state_t* mounts_states);
+int scan_mounted_volumes(mounts_state_t *mounts_state);
 
-const mounted_volume_t *find_mounted_volume_by_device(mounts_state_t* mounts_states, const char *device, int with_bindmounts);
+const mounted_volume_t *find_mounted_volume_by_device(mounts_state_t *mounts_state, const char *device);
+
 const mounted_volume_t *
-find_mounted_volume_by_mount_point(mounts_state_t* mounts_states, const char *mount_point);
+find_mounted_volume_by_mount_point(mounts_state_t *mounts_state, const char *mount_point);
 const mounted_volume_t *
-find_mounted_volume_by_majmin(mounts_state_t* mounts_states, unsigned major, unsigned minor, int with_bindmounts);
+find_mounted_volume_by_majmin(mounts_state_t *mounts_states, unsigned major, unsigned minor, int with_bindmounts);
 
 int unmount_mounted_volume(const mounted_volume_t *volume);
-int unmount_mounted_volume_detach(const mounted_volume_t *volume);
-int remount_read_only(const mounted_volume_t* volume);
+
+int remount_read_only(const mounted_volume_t *volume);
 
 #ifdef __cplusplus
 }
