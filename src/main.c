@@ -36,7 +36,7 @@ static void synch_signal(UNUSED int sig, UNUSED siginfo_t *info, UNUSED void *vp
     usr_interrupt = 1;
 }
 
-int trigger_main(int argc, char **argv)
+static int trigger_main(int argc, char **argv)
 {
     if (argc!=2)
         return -EINVAL;
