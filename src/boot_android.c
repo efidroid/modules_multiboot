@@ -34,7 +34,7 @@
 #define LOG_TAG "BOOT_ANDROID"
 #include <lib/log.h>
 
-static multiboot_data_t* multiboot_data = NULL;
+static multiboot_data_t *multiboot_data = NULL;
 
 #define MBABORT_IF_MB(fmt, ...) do { \
     if(multiboot_data->is_multiboot) \
@@ -43,7 +43,8 @@ static multiboot_data_t* multiboot_data = NULL;
         LOGE(fmt, ##__VA_ARGS__); \
 }while(0)
 
-static void handle_on_early_init(void) {
+static void handle_on_early_init(void)
+{
     int rc;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
@@ -55,15 +56,15 @@ static void handle_on_early_init(void) {
 
         // build path to dev node
         rc = snprintf(buf, sizeof(buf), "/dev/block/%s", replacement->uevent_block->devname);
-        if(SNPRINTF_ERROR(rc, sizeof(buf))) {
+        if (SNPRINTF_ERROR(rc, sizeof(buf))) {
             MBABORT_IF_MB("Can't build path for %s\n", replacement->uevent_block->devname);
             goto finish;
         }
-        char* blk_device = buf;
+        char *blk_device = buf;
 
         // stat original device
         rc = stat(blk_device, &sb_orig);
-        if(rc) {
+        if (rc) {
             MBABORT_IF_MB("Can't stat device at %s\n", blk_device);
             goto finish;
         }
@@ -72,14 +73,14 @@ static void handle_on_early_init(void) {
 
         // stat loop device
         rc = stat(replacement->loopdevice, &sb_loop);
-        if(rc) {
+        if (rc) {
             MBABORT_IF_MB("Can't stat device at %s\n", replacement->loopdevice);
             goto finish;
         }
 
         // create path for backup node
         rc = snprintf(buf2, sizeof(buf2), "%s/replacement_backup_%s", MBPATH_DEV, replacement->uevent_block->devname);
-        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
+        if (SNPRINTF_ERROR(rc, sizeof(buf2))) {
             MBABORT_IF_MB("Can't build name for backup node\n");
             goto finish;
         }
@@ -92,9 +93,9 @@ static void handle_on_early_init(void) {
         }
 
         // delete original node
-        if(util_exists(blk_device, false)) {
+        if (util_exists(blk_device, false)) {
             rc = unlink(blk_device);
-            if(rc) {
+            if (rc) {
                 MBABORT_IF_MB("Can't delete %s\n", blk_device);
                 goto finish;
             }
@@ -109,41 +110,41 @@ static void handle_on_early_init(void) {
     }
 
 finish:
-    if(multiboot_data->is_multiboot && rc)
+    if (multiboot_data->is_multiboot && rc)
         MBABORT("early-init failed: rc=%d errno=%d\n", rc, errno);
 
     return;
 }
 
-static void handle_on_post_fs_data(void) {
+static void handle_on_post_fs_data(void)
+{
     int rc;
     mounts_state_t mounts_state = LIST_INITIAL_VALUE(mounts_state);
 
     // scan mounted volumes
     rc = scan_mounted_volumes(&mounts_state);
-    if(rc) {
+    if (rc) {
         MBABORT_IF_MB("Can't scan mounted volumes: %s\n", strerror(errno));
         goto finish;
     }
 
     // find ESP volume
-    const mounted_volume_t* volume = find_mounted_volume_by_majmin(&mounts_state, multiboot_data->espdev->major, multiboot_data->espdev->minor, 0);
-    if(!volume) {
+    const mounted_volume_t *volume = find_mounted_volume_by_majmin(&mounts_state, multiboot_data->espdev->major, multiboot_data->espdev->minor, 0);
+    if (!volume) {
         LOGI("ESP is not mounted. do this now.\n");
 
         // bind-mount ESP to our dir
         rc = util_mount_esp(multiboot_data->is_multiboot);
-        if(rc) {
+        if (rc) {
             MBABORT_IF_MB("Can't mount ESP: %s\n", strerror(errno));
             goto finish;
         }
-    }
-    else {
+    } else {
         LOGI("bind-mount ESP to %s\n", MBPATH_ESP);
 
         // bind-mount ESP to our dir
         rc = util_mount(volume->mount_point, MBPATH_ESP, NULL, MS_BIND, NULL);
-        if(rc) {
+        if (rc) {
             MBABORT_IF_MB("can't bind-mount ESP to %s: %s\n", MBPATH_ESP, strerror(errno));
             goto finish;
         }
@@ -154,8 +155,8 @@ static void handle_on_post_fs_data(void) {
 
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if(!replacement->losetup_done) {
-            if(!replacement->loopfile) {
+        if (!replacement->losetup_done) {
+            if (!replacement->loopfile) {
                 MBABORT_IF_MB("loopfile required for %s\n", replacement->loopdevice);
                 goto finish;
             }
@@ -163,7 +164,7 @@ static void handle_on_post_fs_data(void) {
             // setup loop device
             LOGD("losetup %s with %s\n", replacement->loopdevice, replacement->loopfile);
             rc = util_losetup(replacement->loopdevice, replacement->loopfile, false);
-            if(rc) {
+            if (rc) {
                 MBABORT_IF_MB("Can't setup loop device at %s for %s\n", replacement->loopdevice, replacement->loopfile);
                 goto finish;
             }
@@ -171,27 +172,27 @@ static void handle_on_post_fs_data(void) {
     }
 
 finish:
-    if(multiboot_data->is_multiboot && rc)
+    if (multiboot_data->is_multiboot && rc)
         MBABORT("post-fs-data init failed: rc=%d errno=%d\n", rc, errno);
 }
 
 static volatile sig_atomic_t mbinit_usr_interrupt = 0;
-static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp) {
+static void mbinit_usr_handler(UNUSED int sig, siginfo_t *info, UNUSED void *vp)
+{
     // ignore further signals
-    if(mbinit_usr_interrupt)
+    if (mbinit_usr_interrupt)
         return;
 
     // get command
-    char* cmd = util_get_file_contents(MBPATH_TRIGGER_CMD);
+    char *cmd = util_get_file_contents(MBPATH_TRIGGER_CMD);
     unlink(MBPATH_TRIGGER_CMD);
-    if(!cmd) goto finish;
+    if (!cmd) goto finish;
 
     LOGI("TRIGGER: %s\n", cmd);
 
-    if(!strcmp(cmd, "early-init")) {
+    if (!strcmp(cmd, "early-init")) {
         handle_on_early_init();
-    }
-    else if(!strcmp(cmd, "post-fs-data")) {
+    } else if (!strcmp(cmd, "post-fs-data")) {
         handle_on_post_fs_data();
     }
 
@@ -204,7 +205,8 @@ finish:
 }
 
 static volatile sig_atomic_t init_usr_interrupt = 0;
-static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp) {
+static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t *info, UNUSED void *vp)
+{
     // stop waiting for signals
     init_usr_interrupt = 1;
 }
@@ -216,13 +218,14 @@ static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void
             MBABORT("Can't write\n"); \
         }
 
-static int fstab_append(int fd, const char* blk_device, const char* mount_point, const char* fs_type, const char* mnt_flags, const char* fs_mgr_flags) {
+static int fstab_append(int fd, const char *blk_device, const char *mount_point, const char *fs_type, const char *mnt_flags, const char *fs_mgr_flags)
+{
     size_t bytes_written;
     size_t len;
 
     // allocate line buffer
     size_t linelen = strlen(blk_device) + strlen(mount_point) + strlen(fs_type) + strlen(mnt_flags) + strlen(fs_mgr_flags) + 6;
-    char* line = safe_malloc(linelen);
+    char *line = safe_malloc(linelen);
 
     // build line
     SAFE_SNPRINTF_RET(MBABORT, -1, line, linelen, "%s %s %s %s %s\n", blk_device, mount_point, fs_type, mnt_flags, fs_mgr_flags);
@@ -241,7 +244,8 @@ static int fstab_append(int fd, const char* blk_device, const char* mount_point,
 #define FIRST_WORD(p) NEXT_WORD_INTERNAL((p), (p))
 #define NEXT_WORD(p) NEXT_WORD_INTERNAL(NULL, (p))
 
-static int process_file(FILE* fp_orig, FILE* fp_out) {
+static int process_file(FILE *fp_orig, FILE *fp_out)
+{
     char line[PATH_MAX];
     char *save_ptr;
     char buf[PATH_MAX];
@@ -255,58 +259,57 @@ static int process_file(FILE* fp_orig, FILE* fp_out) {
         }
 
         // skip over leading whitespace
-        const char* pcmd = line;
+        const char *pcmd = line;
         SKIP_WHITESPACE(pcmd);
 
         // we want mount commands only
-        if(strstr(pcmd, "mount")!=pcmd || !isspace(pcmd[5])) {
+        if (strstr(pcmd, "mount")!=pcmd || !isspace(pcmd[5])) {
             goto write_unmodified;
         }
 
         /* mount <type> <device> <path> <flags ...> <options> */
 
         // create a copy, and keep a pointer to the start
-        char* p_start = strdup(pcmd);
-        char* p = p_start;
+        char *p_start = strdup(pcmd);
+        char *p = p_start;
 
         // remove newline
         p_start[strlen(p_start) - 1] = 0;
 
         // 'mount'
-        if(!FIRST_WORD(p)) goto write_unmodified;
+        if (!FIRST_WORD(p)) goto write_unmodified;
 
         // type
-        if(!NEXT_WORD(p)) goto write_unmodified;
-        char* type = strdup(p);
+        if (!NEXT_WORD(p)) goto write_unmodified;
+        char *type = strdup(p);
 
         // device
-        if(!NEXT_WORD(p)) goto write_unmodified;
-        UNUSED char* device = strdup(p);
+        if (!NEXT_WORD(p)) goto write_unmodified;
+        UNUSED char *device = strdup(p);
 
         // path
-        if(!NEXT_WORD(p)) goto write_unmodified;
-        char* path = strdup(p);
+        if (!NEXT_WORD(p)) goto write_unmodified;
+        char *path = strdup(p);
 
         // flags and options
-        const char* rest = pcmd + (save_ptr-p_start);
+        const char *rest = pcmd + (save_ptr-p_start);
 
         // get uevent block for this device
-        uevent_block_t* uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, device);
-        if(!uevent_block) goto write_unmodified;
+        uevent_block_t *uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, device);
+        if (!uevent_block) goto write_unmodified;
 
         // get replacement for this device
-        part_replacement_t* replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
-        if(!replacement) goto write_unmodified;
-        multiboot_partition_t* part = replacement->multiboot.part;
+        part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
+        if (!replacement) goto write_unmodified;
+        multiboot_partition_t *part = replacement->multiboot.part;
 
-        const char* blk_device;
-        const char* mnt_flags = rest;
+        const char *blk_device;
+        const char *mnt_flags = rest;
         // determine mount args
-        if(part->type==MBPART_TYPE_BIND) {
+        if (part->type==MBPART_TYPE_BIND) {
             blk_device = replacement->multiboot.partpath;
             mnt_flags = "bind";
-        }
-        else {
+        } else {
             blk_device = replacement->loopdevice;
         }
 
@@ -314,7 +317,7 @@ static int process_file(FILE* fp_orig, FILE* fp_out) {
         fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, mnt_flags);
 
         // bind mount datamedia
-        if(!strcmp(path, "/data")) {
+        if (!strcmp(path, "/data")) {
             SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", path, multiboot_data->datamedia_target);
 
             LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
@@ -332,7 +335,8 @@ write_unmodified:
     return 0;
 }
 
-static int patch_rc_files(void) {
+static int patch_rc_files(void)
+{
     DIR *dp;
     struct dirent *ep;
     char buf[PATH_MAX];
@@ -340,10 +344,10 @@ static int patch_rc_files(void) {
     dp = opendir("/");
     if (dp != NULL) {
         while ((ep=readdir (dp))) {
-            if(!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
+            if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
                 continue;
 
-            if(strcmp(util_get_file_extension(ep->d_name), "rc"))
+            if (strcmp(util_get_file_extension(ep->d_name), "rc"))
                 continue;
 
             // rename original file
@@ -351,12 +355,12 @@ static int patch_rc_files(void) {
             rename(ep->d_name, buf);
 
             // open original file
-            FILE* fp_orig = fopen(buf, "r");
-            if(!fp_orig) MBABORT("can't open %s: %s\n", buf, strerror(errno));
+            FILE *fp_orig = fopen(buf, "r");
+            if (!fp_orig) MBABORT("can't open %s: %s\n", buf, strerror(errno));
 
             // open output file
-            FILE* fp_out = fopen(ep->d_name, "w");
-            if(!fp_out) MBABORT("can't open %s: %s\n", ep->d_name, strerror(errno));
+            FILE *fp_out = fopen(ep->d_name, "w");
+            if (!fp_out) MBABORT("can't open %s: %s\n", ep->d_name, strerror(errno));
 
             // process file
             LOGV("process: %s\n", ep->d_name);
@@ -373,15 +377,15 @@ static int patch_rc_files(void) {
             unlink(buf);
         }
         closedir (dp);
-    }
-    else {
+    } else {
         MBABORT("Can't open root directory: %s\n", strerror(errno));
     }
 
     return 0;
 }
 
-int boot_android(void) {
+int boot_android(void)
+{
     multiboot_data = multiboot_get_data();
 
     int rc;
@@ -389,38 +393,37 @@ int boot_android(void) {
     char buf[PATH_MAX];
 
     // multiboot setup
-    if(multiboot_data->is_multiboot) {
+    if (multiboot_data->is_multiboot) {
         // patch all rc files
         patch_rc_files();
 
         // open fstab for writing
         int fd = open(multiboot_data->romfstabpath, O_WRONLY|O_TRUNC);
-        if(fd<0) {
+        if (fd<0) {
             MBABORT("Can't open init.rc for writing\n");
         }
 
         // write entries
         struct fstab_rec *datarec = NULL;
-        for(i=0; i<multiboot_data->romfstab->num_entries; i++) {
+        for (i=0; i<multiboot_data->romfstab->num_entries; i++) {
             struct fstab_rec *rec = &multiboot_data->romfstab->recs[i];
-            const char* blk_device = rec->blk_device;
-            const char* mnt_flags = rec->mnt_flags_orig;
+            const char *blk_device = rec->blk_device;
+            const char *mnt_flags = rec->mnt_flags_orig;
 
             // get uevent block for this device
-            uevent_block_t* uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
-            if(!uevent_block) goto write_entry;
+            uevent_block_t *uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+            if (!uevent_block) goto write_entry;
 
             // get replacement for this device
-            part_replacement_t* replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
-            if(!replacement) goto write_entry;
-            multiboot_partition_t* part = replacement->multiboot.part;
+            part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
+            if (!replacement) goto write_entry;
+            multiboot_partition_t *part = replacement->multiboot.part;
 
             // determine mount args
-            if(part->type==MBPART_TYPE_BIND) {
+            if (part->type==MBPART_TYPE_BIND) {
                 blk_device = replacement->multiboot.partpath;
                 mnt_flags = "bind";
-            }
-            else {
+            } else {
                 blk_device = replacement->loopdevice;
             }
 
@@ -429,13 +432,13 @@ write_entry:
             fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
 
             // save rec for /data
-            if(!strcmp(rec->mount_point, "/data")) {
+            if (!strcmp(rec->mount_point, "/data")) {
                 datarec = rec;
             }
         }
 
         // bind mount datamedia
-        if(datarec) {
+        if (datarec) {
             SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", datarec->mount_point, multiboot_data->datamedia_target);
 
             LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
@@ -450,7 +453,7 @@ write_entry:
     pid_t pid = safe_fork();
 
     // parent
-    if(pid) {
+    if (pid) {
         // install usr handler
         util_setsighandler(SIGUSR1, init_usr_handler);
 
@@ -464,40 +467,40 @@ write_entry:
     else {
         // add trigger events
         SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
-                 "on early-init\n"
-                 // wait for coldboot
-                 "    wait /dev/.coldboot_done\n"
-                 "\n"
+                          "on early-init\n"
+                          // wait for coldboot
+                          "    wait /dev/.coldboot_done\n"
+                          "\n"
 
-                 // start mbtrigger
-                 "    write "MBPATH_TRIGGER_CMD" early-init\n"
-                 "    start mbtrigger\n"
-                 "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+                          // start mbtrigger
+                          "    write "MBPATH_TRIGGER_CMD" early-init\n"
+                          "    start mbtrigger\n"
+                          "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
 
-                 // mbtrigger cleanup
-                 "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+                          // mbtrigger cleanup
+                          "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
 
 
-                 "on post-fs-data\n"
-                 // start mbtrigger
-                 "    write "MBPATH_TRIGGER_CMD" post-fs-data\n"
-                 "    start mbtrigger\n"
-                 "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+                          "on post-fs-data\n"
+                          // start mbtrigger
+                          "    write "MBPATH_TRIGGER_CMD" post-fs-data\n"
+                          "    start mbtrigger\n"
+                          "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
 
-                 // mbtrigger cleanup
-                 "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
-                 "\n"
+                          // mbtrigger cleanup
+                          "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+                          "\n"
 
-                // trigger service
-                 "service mbtrigger "MBPATH_TRIGGER_BIN" %u\n"
-                 "    disabled\n"
-                 "    oneshot\n"
-                 "\n"
+                          // trigger service
+                          "service mbtrigger "MBPATH_TRIGGER_BIN" %u\n"
+                          "    disabled\n"
+                          "    oneshot\n"
+                          "\n"
 
-                 , getpid()
-                );
+                          , getpid()
+                         );
         rc = util_append_string_to_file("/init.rc", buf);
-        if(rc) return rc;
+        if (rc) return rc;
 
         // install trigger handler
         util_setsighandler(SIGUSR1, mbinit_usr_handler);

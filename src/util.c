@@ -41,19 +41,20 @@
 #define LOG_TAG "UTIL"
 #include <lib/log.h>
 
-char* util_basename(const char* path) {
+char *util_basename(const char *path)
+{
     // duplicate input path
-    char* str = safe_strdup(path);
+    char *str = safe_strdup(path);
 
     // get basename
-    char* bname = basename(str);
-    if(!bname) {
+    char *bname = basename(str);
+    if (!bname) {
         free(str);
         return NULL;
     }
 
     // duplicate return value
-    char* ret = safe_strdup(bname);
+    char *ret = safe_strdup(bname);
 
     // cleanup input path
     free(str);
@@ -62,19 +63,20 @@ char* util_basename(const char* path) {
     return ret;
 }
 
-char* util_dirname(const char* path) {
+char *util_dirname(const char *path)
+{
     // duplicate input path
-    char* str = safe_strdup(path);
+    char *str = safe_strdup(path);
 
     // get dirname
-    char* dname = dirname(str);
-    if(!dname) {
+    char *dname = dirname(str);
+    if (!dname) {
         free(str);
         return NULL;
     }
 
     // duplicate return value
-    char* ret = safe_strdup(dname);
+    char *ret = safe_strdup(dname);
 
     // cleanup input path
     free(str);
@@ -83,20 +85,21 @@ char* util_dirname(const char* path) {
     return ret;
 }
 
-int util_buf2file(const void* buf, const char* filename, size_t size) {
+int util_buf2file(const void *buf, const char *filename, size_t size)
+{
     int fd;
     size_t nbytes;
     int rc = 0;
 
     // open file for writing
     fd = open(filename, O_WRONLY | O_CREAT, 0640);
-    if(fd<0) {
+    if (fd<0) {
         return fd;
     }
 
     // write data
     nbytes = write(fd, buf, size);
-    if(nbytes!=size) {
+    if (nbytes!=size) {
         rc = (int)nbytes;
         goto err_close;
     }
@@ -108,11 +111,12 @@ err_close:
     return rc;
 }
 
-int util_exists(const char *filename, bool follow) {
+int util_exists(const char *filename, bool follow)
+{
     struct stat buffer;
     int rc;
 
-    if(follow)
+    if (follow)
         rc = stat(filename, &buffer);
     else
         rc = lstat(filename, &buffer);
@@ -120,16 +124,17 @@ int util_exists(const char *filename, bool follow) {
     return rc==0;
 }
 
-uint64_t util_filesize(const char *filename, bool follow) {
+uint64_t util_filesize(const char *filename, bool follow)
+{
     struct stat buffer;
     int rc;
 
-    if(follow)
+    if (follow)
         rc = stat(filename, &buffer);
     else
         rc = lstat(filename, &buffer);
 
-    if(rc)
+    if (rc)
         return 0;
     else
         return buffer.st_size;
@@ -137,7 +142,8 @@ uint64_t util_filesize(const char *filename, bool follow) {
 
 // Source: http://web.archive.org/web/20130728160829/http://nion.modprobe.de/blog/archives/357-Recursive-directory-creation.html
 //         http://stackoverflow.com/questions/2336242/recursive-mkdir-system-call-on-unix
-int util_mkdir(const char *dir) {
+int util_mkdir(const char *dir)
+{
     char tmp[PATH_MAX+1];
     char *p = NULL;
     size_t len;
@@ -146,15 +152,15 @@ int util_mkdir(const char *dir) {
     SAFE_SNPRINTF_RET(LOGE, -1, tmp, sizeof(tmp), "%s", dir);
     len = strlen(tmp);
 
-    if(tmp[len - 1] == '/')
+    if (tmp[len - 1] == '/')
         tmp[len - 1] = 0;
 
-    for(p = tmp + 1; *p; p++) {
-        if(*p == '/') {
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
             *p = 0;
-            if(!util_exists(tmp, true)) {
+            if (!util_exists(tmp, true)) {
                 rc = mkdir(tmp, S_IRWXU);
-                if(rc) goto done;
+                if (rc) goto done;
             }
 
             *p = '/';
@@ -162,17 +168,17 @@ int util_mkdir(const char *dir) {
     }
 
 
-    if(!util_exists(tmp, true))
+    if (!util_exists(tmp, true))
         rc = mkdir(tmp, S_IRWXU);
 
 done:
-    if(rc)
+    if (rc)
         LOGE("can't create dir %s: %s\n", dir, strerror(errno));
 
     return rc;
 }
 
-int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
+int util_exec_main(int argc, char **argv, int (*mainfn)(int, char **))
 {
     pid_t pid;
     int status = 0;
@@ -190,21 +196,23 @@ int util_exec_main(int argc, char** argv, int (*mainfn)(int, char**))
     return status;
 }
 
-int util_sepolicy_inject(const char* source, const char* target, const char* clazz, const char* perm) {
+int util_sepolicy_inject(const char *source, const char *target, const char *clazz, const char *perm)
+{
     return sepolicy_inject_rule(source, target, clazz, perm, "/sepolicy", NULL);
 }
 
-int util_append_string_to_file(const char* filename, const char* str) {
+int util_append_string_to_file(const char *filename, const char *str)
+{
     int rc = 0;
 
     int fd = open(filename, O_WRONLY|O_APPEND);
-    if(fd<0) {
+    if (fd<0) {
         return fd;
     }
 
     size_t len = strlen(str);
     size_t bytes_written = write(fd, str, len);
-    if(bytes_written!=len) {
+    if (bytes_written!=len) {
         rc = -errno;
         goto out;
     }
@@ -215,13 +223,14 @@ out:
     return rc;
 }
 
-int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *)) {
+int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *))
+{
     struct sigaction usr_action;
     sigset_t block_mask;
     int rc;
 
     rc = sigfillset (&block_mask);
-    if(rc) {
+    if (rc) {
         return rc;
     }
 
@@ -236,20 +245,20 @@ int util_mount(const char *source, const char *target,
                const void *data)
 {
     int rc = 0;
-    char* util_fstype = NULL;
+    char *util_fstype = NULL;
 
     // create target directory
-    if(!util_exists(target, true)) {
+    if (!util_exists(target, true)) {
         rc = util_mkdir(target);
-        if(rc) {
+        if (rc) {
             return rc;
         }
     }
 
     // get fstype
-    if(!filesystemtype && !(mountflags&MS_BIND)) {
+    if (!filesystemtype && !(mountflags&MS_BIND)) {
         filesystemtype = util_fstype = util_get_fstype(source);
-        if(!filesystemtype) {
+        if (!filesystemtype) {
             LOGE("can't get filesystem for %s\n", source);
             return -1;
         }
@@ -257,7 +266,7 @@ int util_mount(const char *source, const char *target,
 
     // mount
     rc = mount(source, target, filesystemtype, mountflags, data);
-    if(rc) {
+    if (rc) {
         LOGE("mount(%s, %s, %s, %lu, %p) failed: %s\n", source, target, filesystemtype, mountflags, data, strerror(errno));
         return -1;
     }
@@ -293,8 +302,8 @@ int util_losetup(const char *_device, const char *_file, bool ro)
     int rc;
 
     // duplicate arguments
-    char* device = safe_strdup(_device);
-    char* file = safe_strdup(_file);
+    char *device = safe_strdup(_device);
+    char *file = safe_strdup(_file);
 
     // tool
     par[i++] = "losetup";
@@ -321,25 +330,26 @@ int util_losetup(const char *_device, const char *_file, bool ro)
 
 int util_losetup_free(const char *device)
 {
-    const char* args[] = {"losetup", "-f", device, 0};
-    return util_exec_main(3, (char**)args, busybox_main);
+    const char *args[] = {"losetup", "-f", device, 0};
+    return util_exec_main(3, (char **)args, busybox_main);
 }
 
-static int util_mke2fs(const char *device, const char* fstype)
+static int util_mke2fs(const char *device, const char *fstype)
 {
-    const char* args[] = {"mke2fs", "-t", fstype, "-m", "0", "-F", device, 0};
-    return util_exec_main(7, (char**)args, mke2fs_main);
+    const char *args[] = {"mke2fs", "-t", fstype, "-m", "0", "-F", device, 0};
+    return util_exec_main(7, (char **)args, mke2fs_main);
 }
 
-int util_mkfs(const char *device, const char* fstype) {
-    if(!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
+int util_mkfs(const char *device, const char *fstype)
+{
+    if (!strcmp(fstype, "ext2") || !strcmp(fstype, "ext3") || !strcmp(fstype, "ext4"))
         return util_mke2fs(device, fstype);
 
     LOGE("filesystem %s is not supported\n", fstype);
     return -1;
 }
 
-int util_block_num(const char *path, unsigned long* numblocks)
+int util_block_num(const char *path, unsigned long *numblocks)
 {
     int fd;
 
@@ -364,9 +374,9 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
     char *buf_if = NULL, *buf_of = NULL, *buf_bs = NULL, *buf_count = NULL;
 
     // get number of blocks
-    if(blocks==0) {
+    if (blocks==0) {
         rc = util_block_num(source, &blocks);
-        if(rc) return rc;
+        if (rc) return rc;
     }
 
     // tool
@@ -409,25 +419,25 @@ int util_dd(const char *source, const char *target, unsigned long blocks)
 
 int util_cp(const char *source, const char *target)
 {
-    const char* args[] = {"cp", source, target, 0};
-    return util_exec_main(3, (char**)args, busybox_main);
+    const char *args[] = {"cp", source, target, 0};
+    return util_exec_main(3, (char **)args, busybox_main);
 }
 
 int util_shell(const char *cmd)
 {
-    const char* args[] = {"sh", "-c", cmd, 0};
-    return util_exec_main(3, (char**)args, busybox_main);
+    const char *args[] = {"sh", "-c", cmd, 0};
+    return util_exec_main(3, (char **)args, busybox_main);
 }
 
 char *util_get_fstype(const char *filename)
 {
     const char *type;
-    char* ret = NULL;
+    char *ret = NULL;
     blkid_probe pr;
 
     // probe device
     pr = blkid_new_probe_from_filename(filename);
-    if(!pr) {
+    if (!pr) {
         LOGE("can't create probe for %s\n", filename);
         return NULL;
     }
@@ -452,25 +462,25 @@ out:
     return ret;
 }
 
-char* util_get_espdir(const char* mountpoint) {
+char *util_get_espdir(const char *mountpoint)
+{
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+    multiboot_data_t *multiboot_data = multiboot_get_data();
 
-    if(!multiboot_data->esp) {
+    if (!multiboot_data->esp) {
         return NULL;
     }
 
     // get esp directory
-    const char* espdir = NULL;
+    const char *espdir = NULL;
     int is_datamedia = 0;
-    if(multiboot_data->esp->esp[0]=='/')
+    if (multiboot_data->esp->esp[0]=='/')
         espdir = multiboot_data->esp->esp+1;
-    else if(!strcmp(multiboot_data->esp->esp, "datamedia")) {
+    else if (!strcmp(multiboot_data->esp->esp, "datamedia")) {
         espdir = "media";
         is_datamedia = 1;
-    }
-    else {
+    } else {
         LOGE("Invalid ESP path %s\n", multiboot_data->esp->esp);
         return NULL;
     }
@@ -478,11 +488,11 @@ char* util_get_espdir(const char* mountpoint) {
     SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), "%s/%s/UEFIESP", mountpoint, espdir);
 
     // check if UEFIESP exists in root dir
-    if(!util_exists(buf, true) && is_datamedia) {
+    if (!util_exists(buf, true) && is_datamedia) {
         SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0", mountpoint, espdir);
 
         // check if /0 exists
-        if(util_exists(buf2, true)) {
+        if (util_exists(buf2, true)) {
             SAFE_SNPRINTF_RET(LOGE, NULL, buf2, sizeof(buf2), "%s/%s/0/UEFIESP", mountpoint, espdir);
             return safe_strdup(buf2);
         }
@@ -492,14 +502,15 @@ char* util_get_espdir(const char* mountpoint) {
     return safe_strdup(buf);
 }
 
-char* util_get_esp_path_for_partition(const char* mountpoint, const char* name) {
+char *util_get_esp_path_for_partition(const char *mountpoint, const char *name)
+{
     int rc;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
 
     // get espdir
-    char* espdir = util_get_espdir(mountpoint);
-    if(!espdir) {
+    char *espdir = util_get_espdir(mountpoint);
+    if (!espdir) {
         LOGE("Can't get ESP directory: %s\n", strerror(errno));
         return NULL;
     }
@@ -507,14 +518,14 @@ char* util_get_esp_path_for_partition(const char* mountpoint, const char* name) 
     // copy path
     rc = snprintf(buf, sizeof(buf), "%s", espdir);
     free(espdir);
-    if(SNPRINTF_ERROR(rc, sizeof(buf))) {
+    if (SNPRINTF_ERROR(rc, sizeof(buf))) {
         LOGE("snprintf error\n");
         return NULL;
     }
 
     // create path for loop image
     rc = snprintf(buf2, sizeof(buf2), "%s/partition_%s.img", buf, name);
-    if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
+    if (SNPRINTF_ERROR(rc, sizeof(buf2))) {
         LOGE("snprintf error\n");
         return NULL;
     }
@@ -523,17 +534,18 @@ char* util_get_esp_path_for_partition(const char* mountpoint, const char* name) 
     return safe_strdup(buf2);
 }
 
-int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force) {
+int util_create_partition_backup_ex(const char *device, const char *file, unsigned long num_blocks, bool force)
+{
     int rc;
 
     // get number of blocks
-    if(num_blocks==0)
+    if (num_blocks==0)
         util_block_num(device, &num_blocks);
 
     // create raw image if it doesn't exists yet
-    if(force || !util_exists(file, false)) {
+    if (force || !util_exists(file, false)) {
         rc = util_dd(device, file, num_blocks);
-        if(rc) {
+        if (rc) {
             LOGE("Can't copy %s to %s: %d\n", device, file, rc);
             return -1;
         }
@@ -542,15 +554,17 @@ int util_create_partition_backup_ex(const char* device, const char* file, unsign
     return 0;
 }
 
-int util_create_partition_backup(const char* device, const char* file) {
+int util_create_partition_backup(const char *device, const char *file)
+{
     return util_create_partition_backup_ex(device, file, 0, false);
 }
 
-char* util_getmbpath_from_device(const char* device) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+char *util_getmbpath_from_device(const char *device)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
     char buf[PATH_MAX];
 
-    if(!multiboot_data->blockinfo) {
+    if (!multiboot_data->blockinfo) {
         return NULL;
     }
 
@@ -564,31 +578,33 @@ char* util_getmbpath_from_device(const char* device) {
     return safe_strdup(buf);
 }
 
-static const char* multiboot_bind_whitelist[] = {
+static const char *multiboot_bind_whitelist[] = {
     "ext2",
     "ext3",
     "ext4",
     "f2fs",
 };
 
-int util_fs_supports_multiboot_bind(const char* type) {
+int util_fs_supports_multiboot_bind(const char *type)
+{
     uint32_t i;
 
-    for(i=0; i<ARRAY_SIZE(multiboot_bind_whitelist); i++) {
-        if(!strcmp(multiboot_bind_whitelist[i], type))
+    for (i=0; i<ARRAY_SIZE(multiboot_bind_whitelist); i++) {
+        if (!strcmp(multiboot_bind_whitelist[i], type))
             return 1;
     }
 
     return 0;
 }
 
-int util_mount_esp(int abort_on_error) {
+int util_mount_esp(int abort_on_error)
+{
     int rc;
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+    multiboot_data_t *multiboot_data = multiboot_get_data();
 
     rc = util_mount_blockinfo_with_romflags(multiboot_data->espdev, MBPATH_ESP);
-    if(rc) {
-        if(abort_on_error)
+    if (rc) {
+        if (abort_on_error)
             MBABORT("Can't mount ESP: %s\n", strerror(errno));
         else
             LOGE("Can't mount ESP: %s\n", strerror(errno));
@@ -605,17 +621,17 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
 
     // create mountpoint directory
     rc = util_mkdir(_target);
-    if(rc) {
+    if (rc) {
         LOGE("Can't create directory at %s\n", _target);
         return -1;
     }
 
     // duplicate arguments
-    char* source = safe_strdup(_source);
-    char* target = safe_strdup(_target);
+    char *source = safe_strdup(_source);
+    char *target = safe_strdup(_target);
 
     // build size
-    char* ssize = safe_malloc(PATH_MAX);
+    char *ssize = safe_malloc(PATH_MAX);
     SAFE_SNPRINTF_RET(LOGE, -1, ssize, PATH_MAX, "-s%llu", size);
 
     // tool
@@ -646,30 +662,31 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
     return rc;
 }
 
-int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+int util_mount_blockinfo_with_romflags(uevent_block_t *bi, const char *mountpoint)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
     int rc;
 
     // get the ROM's mount flags
     unsigned long mountflags = 0;
-    const void* data = NULL;
-    struct fstab_rec* romrec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, bi);
-    if(romrec) {
+    const void *data = NULL;
+    struct fstab_rec *romrec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, bi);
+    if (romrec) {
         mountflags = romrec->flags;
-        data = (void*)romrec->fs_options;
-        LOGD("use ROM mountflags for %s, flags:%lu, data:%s\n", bi->devname, mountflags, (const char*)data);
+        data = (void *)romrec->fs_options;
+        LOGD("use ROM mountflags for %s, flags:%lu, data:%s\n", bi->devname, mountflags, (const char *)data);
     }
 
     // mount data
     LOGD("mount %s at %s\n", bi->devname, mountpoint);
     rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
-    if(rc) {
+    if (rc) {
         // mount without flags
         LOGI("mount %s without flags\n", bi->devname);
         mountflags = 0;
         data = NULL;
         rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
-        if(rc) {
+        if (rc) {
             LOGE("Can't mount %s: %s\n", bi->devname, strerror(errno));
             return -1;
         }
@@ -678,13 +695,14 @@ int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoin
     return 0;
 }
 
-int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+int util_mount_mbinipart_with_romflags(const char *name, const char *mountpoint)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
 
     // get rec from mb fstab
     LOGV("search fstab.multiboot for %s\n", name);
-    struct fstab_rec* mbrec = fs_mgr_get_by_mountpoint(multiboot_data->mbfstab, name);
-    if(!mbrec) {
+    struct fstab_rec *mbrec = fs_mgr_get_by_mountpoint(multiboot_data->mbfstab, name);
+    if (!mbrec) {
         LOGE("Can't get rec for %s\n", name);
         errno = ENOENT;
         return -1;
@@ -692,8 +710,8 @@ int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint)
 
     // get blockinfo
     LOGV("get blockinfo for %s\n", mbrec->blk_device);
-    uevent_block_t* bi = get_blockinfo_for_path(multiboot_data->blockinfo, mbrec->blk_device);
-    if(!bi) {
+    uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, mbrec->blk_device);
+    if (!bi) {
         LOGE("Can't get blockinfo for %s\n", mbrec->blk_device);
         errno = ENOENT;
         return -1;
@@ -703,15 +721,16 @@ int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint)
 }
 
 typedef struct {
-    const char* propertyname;
-    char* value;
+    const char *propertyname;
+    char *value;
 } getprop_pdata_t;
 
-static int getprop_handler(void* user, UNUSED const char* section, const char* name, const char* value) {
-    getprop_pdata_t* pdata = user;
+static int getprop_handler(void *user, UNUSED const char *section, const char *name, const char *value)
+{
+    getprop_pdata_t *pdata = user;
 
     // we're interested in partitions only
-    if(!strcmp(name, pdata->propertyname)) {
+    if (!strcmp(name, pdata->propertyname)) {
         pdata->value = safe_strdup(value);
         return 0;
     }
@@ -719,7 +738,8 @@ static int getprop_handler(void* user, UNUSED const char* section, const char* n
     return 1;
 }
 
-char* util_get_property(const char* filename, const char* propertyname) {
+char *util_get_property(const char *filename, const char *propertyname)
+{
     getprop_pdata_t pdata = {
         .propertyname = propertyname,
         .value = NULL,
@@ -728,22 +748,23 @@ char* util_get_property(const char* filename, const char* propertyname) {
     return pdata.value;
 }
 
-int util_read_int(const char* filename, uint32_t* pvalue) {
+int util_read_int(const char *filename, uint32_t *pvalue)
+{
     int rc;
 
     // validate arguments
-    if(!filename || !pvalue) {
+    if (!filename || !pvalue) {
         errno = EINVAL;
         return -1;
     }
 
     // open file
     int fd = open(filename, O_RDONLY);
-    if(fd<0) return -1;
+    if (fd<0) return -1;
 
     // read file
     char buffer[20];
-    if(read(fd, buffer, sizeof(buffer))<0) {
+    if (read(fd, buffer, sizeof(buffer))<0) {
         rc = -1;
         goto close_file;
     }
@@ -762,25 +783,26 @@ close_file:
     return rc;
 }
 
-int util_write_int(char const* path, int value) {
+int util_write_int(char const *path, int value)
+{
     int rc;
     ssize_t byte_count;
 
     // open file
     int fd = open(path, O_WRONLY|O_TRUNC|O_CREAT);
-    if(fd<0) return -1;
+    if (fd<0) return -1;
 
     // convert value
     char buffer[20];
     rc = snprintf(buffer, sizeof(buffer), "%d\n", value);
-    if(SNPRINTF_ERROR(rc, sizeof(buffer))) {
+    if (SNPRINTF_ERROR(rc, sizeof(buffer))) {
         rc = -1;
         goto close_file;
     }
 
     // write value
     byte_count = write(fd, buffer, rc);
-    if(byte_count<0 || byte_count!=rc) {
+    if (byte_count<0 || byte_count!=rc) {
         rc = -1;
         goto close_file;
     }
@@ -793,30 +815,33 @@ close_file:
     return rc;
 }
 
-part_replacement_t* util_get_replacement_by_name(const char* name) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+part_replacement_t *util_get_replacement_by_name(const char *name)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
 
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if(replacement->multiboot.part && !strcmp(replacement->multiboot.part->name, name)) {
+        if (replacement->multiboot.part && !strcmp(replacement->multiboot.part->name, name)) {
             return replacement;
         }
     }
     return NULL;
 }
 
-const char *util_get_file_extension(const char *filename) {
+const char *util_get_file_extension(const char *filename)
+{
     const char *dot = strrchr(filename, '.');
-    if(!dot || dot == filename) return "";
+    if (!dot || dot == filename) return "";
     return dot + 1;
 }
 
-char* util_get_file_contents(const char* filename) {
+char *util_get_file_contents(const char *filename)
+{
     char *buffer = NULL;
 
     // open file
     FILE *fh = fopen(filename, "rb");
-    if(!fh) return NULL;
+    if (!fh) return NULL;
 
     // get file size
     fseek(fh, 0L, SEEK_END);
@@ -830,7 +855,7 @@ char* util_get_file_contents(const char* filename) {
     }
 
     // read file
-    if(fread(buffer, size, 1, fh)!=1) {
+    if (fread(buffer, size, 1, fh)!=1) {
         goto free_buffer;
     }
 
@@ -848,12 +873,13 @@ close_file:
     return buffer;
 }
 
-part_replacement_t* util_get_replacement(unsigned int major, unsigned int minor) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
+part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
 
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if(replacement->uevent_block->major==major && replacement->uevent_block->minor==minor) {
+        if (replacement->uevent_block->major==major && replacement->uevent_block->minor==minor) {
             return replacement;
         }
     }

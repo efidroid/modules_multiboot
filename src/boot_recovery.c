@@ -36,12 +36,13 @@
 #define LOG_TAG "BOOT_RECOVERY"
 #include <lib/log.h>
 
-int boot_recovery(void) {
+int boot_recovery(void)
+{
     int rc;
 
     // run and trace init
     rc = run_init(true);
-    if(rc) {
+    if (rc) {
         MBABORT("Can't trace init: %s\n", strerror(errno));
     }
 
