@@ -237,7 +237,7 @@ static int selinux_fixup(void)
 
     util_sepolicy_inject("init_multiboot", "rootfs", "filesystem", "associate");
     util_sepolicy_inject("init", "init_multiboot", "file", "relabelto,getattr,execute,read,execute_no_trans,open");
-    util_sepolicy_inject("kernel", "rootfs", "file", "execute");
+    util_sepolicy_inject("kernel", "rootfs", "file", "execute,unlink");
     util_sepolicy_inject("rootfs", "tmpfs", "filesystem", "associate");
 
     // let init run postfs trigger
@@ -246,11 +246,11 @@ static int selinux_fixup(void)
     util_sepolicy_inject("init", "rootfs", "file", "create,write,unlink");
 
     // let init.multiboot do it's postfs work
-    util_sepolicy_inject("kernel", "rootfs", "dir", "read,write,add_name,create");
+    util_sepolicy_inject("kernel", "rootfs", "dir", "read,write,add_name,create,remove_name");
     util_sepolicy_inject("kernel", "tmpfs", "dir", "mounton");
     util_sepolicy_inject("kernel", "kernel", "capability", "mknod,sys_admin");
     util_sepolicy_inject("kernel", "init", "dir", "search");
-    util_sepolicy_inject("kernel", "init", "file", "read,open");
+    util_sepolicy_inject("kernel", "init", "file", "read,open,getattr");
     util_sepolicy_inject("kernel", "init", "process", "signal");
     util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
     util_sepolicy_inject("kernel", "block_device", "blk_file", "create,unlink,getattr,write");
