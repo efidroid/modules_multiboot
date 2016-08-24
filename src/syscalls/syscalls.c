@@ -96,7 +96,7 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     }
 
     // get replacement
-    replacement = syshook_get_replacement(major, minor);
+    replacement = util_get_replacement(major, minor);
     if(!replacement) {
         goto run_syscall;
     }
@@ -178,20 +178,20 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
     }
 
     // get replacement
-    replacement = syshook_get_replacement(major, minor);
+    replacement = util_get_replacement(major, minor);
     if(!replacement) {
         goto continue_syscall;
     }
 
     // bind
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND) {
+    if(replacement->multiboot.part && replacement->multiboot.part->type==MBPART_TYPE_BIND) {
         // copy dir_name to our space
         kdirname[0] = 0;
         syshook_strncpy_user(process, kdirname, dir_name, sizeof(kdirname));
 
         // mount directly
-        ret = mount(replacement->u.multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
-        LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->u.multiboot.partpath, kdirname, (int)ret);
+        ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
+        LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
         return ret;
     }
 

@@ -546,15 +546,9 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
         uevent_block_t *fstab_block = get_blockinfo_for_path(multiboot_get_data()->blockinfo, fstab->recs[i].blk_device);
         if(!fstab_block)
             continue;
-        
-        if(block->major==fstab_block->major &&
-           block->minor==fstab_block->minor &&
-           block->partn==fstab_block->partn &&
-           !strcmp(block->devname, fstab_block->devname) &&
-           !strcmp(block->partname, fstab_block->partname) &&
-           block->type==fstab_block->type &&
-           (!fstype || !strcmp(fstype, fstab->recs[i].fs_type)) )
-        {
+
+        // assume that we only have one global blockinfo list
+        if(fstab_block==block) {
             ret = &fstab->recs[i];
             break;
         }
@@ -573,6 +567,21 @@ struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* moun
 
     for (i = 0; i < fstab->num_entries; i++) {
         if(!strcmp(fstab->recs[i].mount_point, mount_point))
+            return &fstab->recs[i];
+    }
+
+    return NULL;
+}
+
+struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name) {
+    int i = 0;
+
+    if (!fstab) {
+        return NULL;
+    }
+
+    for (i = 0; i < fstab->num_entries; i++) {
+        if(!strcmp(fstab->recs[i].mount_point+1, name))
             return &fstab->recs[i];
     }
 

@@ -60,21 +60,21 @@ int util_cp(const char *source, const char *target);
 int util_shell(const char *cmd);
 char *util_get_fstype(const char *filename);
 char* util_get_espdir(const char* mountpoint);
-char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec);
 int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force);
 int util_create_partition_backup(const char* device, const char* file);
 char* util_getmbpath_from_device(const char* device);
 int util_fs_supports_multiboot_bind(const char* type);
-char* util_device_from_mbname(const char* name);
-multiboot_partition_t* util_mbpart_by_name(const char* name);
 int util_mount_esp(int abort_on_error);
 int util_dynfilefs(const char *_source, const char *_target, uint64_t size);
-int util_setup_partition_replacements(void);
 int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint);
 int util_mount_mbinipart_with_romflags(const char* name, const char* mountpoint);
 char* util_get_property(const char* filename, const char* propertyname);
 int util_read_int(const char* filename, uint32_t* pvalue);
 int util_write_int(char const* path, int value);
 part_replacement_t* util_get_replacement_by_name(const char* name);
+const char *util_get_file_extension(const char *filename);
+char* util_get_file_contents(const char* filename);
+char* util_get_esp_path_for_partition(const char* mountpoint, const char* name);
+part_replacement_t* util_get_replacement(unsigned int major, unsigned int minor);
 
 #endif

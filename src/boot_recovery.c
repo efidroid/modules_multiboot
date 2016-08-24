@@ -39,8 +39,6 @@
 int boot_recovery(void) {
     int rc;
 
-    util_setup_partition_replacements();
-
     // run and trace init
     rc = run_init(true);
     if(rc) {

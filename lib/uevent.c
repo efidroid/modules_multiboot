@@ -234,6 +234,30 @@ uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path)
     return ret;
 }
 
+uevent_block_t *get_blockinfo_for_partname(list_node_t *info, const char *partname)
+{
+    uevent_block_t *event;
+    list_for_every_entry(info, event, uevent_block_t, node) {
+        if (event->partname && !strcmp(event->partname, partname)) {
+            return event;
+        }
+    }
+
+    return NULL;
+}
+
+uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname)
+{
+    uevent_block_t *event;
+    list_for_every_entry(info, event, uevent_block_t, node) {
+        if (event->partname && !strcmp(event->devname, devname)) {
+            return event;
+        }
+    }
+
+    return NULL;
+}
+
 char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path)
 {
     uevent_block_t *bi = get_blockinfo_for_path(info, path);

@@ -263,7 +263,7 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
     mounts_state_t mounts_state = {0};
 
     if(replacement) {
-        LOGI("%s got formatted. syncing ESP replacement\n", replacement->loopdevice);
+        LOGI("%s has changed. syncing ESP replacement\n", replacement->loopdevice);
     }
     else {
         LOGI("ESP dev got closed. syncing ALL ESP replacements\n");
@@ -288,15 +288,9 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         mountpoint = MBPATH_ESP;
     }
 
-    // get espdir
-    char* espdir = util_get_espdir(mountpoint);
-    if(!espdir) {
-        MBABORT("Can't get ESP directory: %s\n", strerror(errno));
-    }
-
     if(replacement) {
         // get ESP filename
-        char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->rec);
+        char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->loop_sync_target);
         if(!espfilename) {
             MBABORT("Can't get filename\n");
         }
@@ -304,12 +298,17 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         // copy loop to esp
         rc = util_dd(replacement->loopdevice, espfilename, 0);
         if(rc) {
-            MBABORT("Can't create partition image\n");
+            MBABORT("Can't dd %s to %s\n", replacement->loopdevice, espfilename);
         }
-
-        free(espfilename);
     }
     else {
+        // get espdir
+        char* espdir = util_get_espdir(mountpoint);
+        if(!espdir) {
+            MBABORT("Can't get ESP directory: %s\n", strerror(errno));
+        }
+
+        // (re-)create esp dir
         if(!util_exists(espdir, false)) {
             rc = util_mkdir(espdir);
             if(rc) {
@@ -317,27 +316,29 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
             }
         }
 
+        // copy all loop devices to ESP
         list_for_every_entry(&syshook_multiboot_data->replacements, replacement, part_replacement_t, node) {
             pthread_mutex_lock(&replacement->lock);
 
             // get ESP filename
-            char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->rec);
+            char* espfilename = util_get_esp_path_for_partition(mountpoint, replacement->loop_sync_target);
             if(!espfilename) {
                 MBABORT("Can't get filename\n");
             }
 
             // copy loop to esp
-            if(!util_exists(espfilename, false)) {
+            if(!util_exists(replacement->loop_sync_target, false)) {
                 rc = util_dd(replacement->loopdevice, espfilename, 0);
                 if(rc) {
-                    MBABORT("Can't create partition image\n");
+                    MBABORT("Can't dd %s to %s\n", replacement->loopdevice, espfilename);
                 }
             }
 
-            free(espfilename);
-
             pthread_mutex_unlock(&replacement->lock);
         }
+
+        // cleanup
+        free(espdir);
     }
 
     if(!volume) {
@@ -349,9 +350,6 @@ static int syshookutil_handle_close_native(part_replacement_t* replacement) {
         free_mounts_state(&mounts_state);
     }
 
-    // cleanup
-    free(espdir);
-
     return 0;
 }
 
@@ -359,7 +357,7 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
     int rc;
     char buf[PATH_MAX];
 
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_BIND) {
+    if(replacement->multiboot.part->type==MBPART_TYPE_BIND) {
         // mount loop
         SAFE_MOUNT(replacement->loopdevice, MBPATH_STUB, NULL, 0, NULL);
 
@@ -375,12 +373,12 @@ static int syshookutil_handle_close_multiboot(part_replacement_t* replacement) {
             close(fd);
 
             // build format command
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->u.multiboot.partpath);
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->multiboot.partpath);
 
             // format bind source
             rc = util_shell(buf);
             if(rc) {
-                MBABORT("Can't format bind source at %s\n", replacement->u.multiboot.partpath);
+                MBABORT("Can't format bind source at %s\n", replacement->multiboot.partpath);
             }
         }
 
@@ -402,33 +400,35 @@ int syshook_handle_fd_close(fdinfo_t* fdinfo) {
 
     // check if this was the ESP
     if(fdinfo->major==syshook_multiboot_data->espdev->major && fdinfo->minor==syshook_multiboot_data->espdev->minor) {
+        // THIS SHOULD NEVER HAPPEN
+        if(syshook_multiboot_data->is_multiboot) {
+            MBABORT("formatted ESP in multiboot mode\n");
+        }
+
         return syshookutil_handle_close_native(NULL);
     }
 
     // get replacement
-    replacement = syshook_get_replacement(fdinfo->major, fdinfo->minor);
+    replacement = util_get_replacement(fdinfo->major, fdinfo->minor);
     if(!replacement) {
         return 0;
     }
 
     pthread_mutex_lock(&replacement->lock);
-    if(syshook_multiboot_data->is_multiboot && replacement->u.multiboot.part) {
+    if(replacement->multiboot.part) {
         rc = syshookutil_handle_close_multiboot(replacement);
     }
-    else {
+    else if(replacement->loop_sync_target) {
         rc = syshookutil_handle_close_native(replacement);
+    }
+    else if(!syshook_multiboot_data->is_multiboot) {
+        MBABORT("in native recovery, all replacements should be synced\n");
+        rc = -1;
+    }
+    else {
+        rc = 0;
     }
     pthread_mutex_unlock(&replacement->lock);
 
     return rc;
-}
-
-part_replacement_t* syshook_get_replacement(unsigned int major, unsigned int minor) {
-    part_replacement_t *replacement;
-    list_for_every_entry(&syshook_multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if(replacement->major==major && replacement->minor==minor) {
-            return replacement;
-        }
-    }
-    return NULL;
 }

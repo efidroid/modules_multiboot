@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <dirent.h>
 
 #include <lib/mounts.h>
 
@@ -41,20 +43,81 @@ static multiboot_data_t* multiboot_data = NULL;
         LOGE(fmt, ##__VA_ARGS__); \
 }while(0)
 
-static volatile sig_atomic_t mbinit_usr_interrupt = 0;
-static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp) {
+static void handle_on_early_init(void) {
     int rc;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
-    char* esp_mountpoint = NULL;
+
+    part_replacement_t *replacement;
+    list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
+        struct stat sb_orig;
+        struct stat sb_loop;
+
+        // build path to dev node
+        rc = snprintf(buf, sizeof(buf), "/dev/block/%s", replacement->uevent_block->devname);
+        if(SNPRINTF_ERROR(rc, sizeof(buf))) {
+            MBABORT_IF_MB("Can't build path for %s\n", replacement->uevent_block->devname);
+            goto finish;
+        }
+        char* blk_device = buf;
+
+        // stat original device
+        rc = stat(blk_device, &sb_orig);
+        if(rc) {
+            MBABORT_IF_MB("Can't stat device at %s\n", blk_device);
+            goto finish;
+        }
+
+        LOGD("replace %s with %s\n", blk_device, replacement->loopdevice);
+
+        // stat loop device
+        rc = stat(replacement->loopdevice, &sb_loop);
+        if(rc) {
+            MBABORT_IF_MB("Can't stat device at %s\n", replacement->loopdevice);
+            goto finish;
+        }
+
+        // create path for backup node
+        rc = snprintf(buf2, sizeof(buf2), "%s/replacement_backup_%s", MBPATH_DEV, replacement->uevent_block->devname);
+        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
+            MBABORT_IF_MB("Can't build name for backup node\n");
+            goto finish;
+        }
+
+        // create backup node
+        rc = mknod(buf2, S_IRUSR | S_IWUSR | S_IFBLK, makedev(major(sb_orig.st_rdev), minor(sb_orig.st_rdev)));
+        if (rc) {
+            MBABORT_IF_MB("Can't create backup node for device %s\n", buf2);
+            goto finish;
+        }
+
+        // delete original node
+        if(util_exists(blk_device, false)) {
+            rc = unlink(blk_device);
+            if(rc) {
+                MBABORT_IF_MB("Can't delete %s\n", blk_device);
+                goto finish;
+            }
+        }
+
+        // create new node
+        rc = mknod(blk_device, sb_orig.st_mode, makedev(major(sb_loop.st_rdev), minor(sb_loop.st_rdev)));
+        if (rc) {
+            MBABORT_IF_MB("Can't create replacement node at %s\n", blk_device);
+            goto finish;
+        }
+    }
+
+finish:
+    if(multiboot_data->is_multiboot && rc)
+        MBABORT("early-init failed: rc=%d errno=%d\n", rc, errno);
+
+    return;
+}
+
+static void handle_on_post_fs_data(void) {
+    int rc;
     mounts_state_t mounts_state = {0};
-
-    // ignore further signals
-    if(mbinit_usr_interrupt)
-        return;
-
-    // stop waiting for signals
-    mbinit_usr_interrupt = 1;
 
     // scan mounted volumes
     rc = scan_mounted_volumes(&mounts_state);
@@ -89,98 +152,54 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp)
     // free mount state
     free_mounts_state(&mounts_state);
 
-    // get espdir
-    esp_mountpoint = util_get_espdir(volume->mount_point);
-    if(!esp_mountpoint) {
-        MBABORT_IF_MB("Can't get ESP directory: %s\n", strerror(errno));
-        rc = -ENOENT;
-        goto finish;
-    }
-
-    // create UEFIESP directory
-    if(!util_exists(esp_mountpoint, true)) {
-        rc = util_mkdir(esp_mountpoint);
-        if(rc) {
-            MBABORT_IF_MB("Can't create directory at %s\n", esp_mountpoint);
-            goto finish;
-        }
-    }
-
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        struct fstab_rec *rec = replacement->rec;
-        struct stat sb_orig;
-        struct stat sb_loop;
-
-        // resolve symlinks for device node
-        char* blk_device = realpath(rec->blk_device, buf);
-        if(!blk_device) {
-            MBABORT_IF_MB("Can't get real path for %s\n", rec->blk_device);
-            rc = -1;
-            goto finish;
-        }
-
-        // stat original device
-        rc = stat(blk_device, &sb_orig);
-        if(rc) {
-            MBABORT_IF_MB("Can't stat device at %s\n", blk_device);
-            goto finish;
-        }
-
-        // create path for backup node
-        rc = snprintf(buf2, sizeof(buf2), "%s/replacement_backup_%s", MBPATH_DEV, rec->mount_point+1);
-        if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
-            MBABORT_IF_MB("Can't build name for backup node\n");
-            goto finish;
-        }
-
-        // create backup node
-        rc = mknod(buf2, S_IRUSR | S_IWUSR | S_IFBLK, makedev(major(sb_orig.st_rdev), minor(sb_orig.st_rdev)));
-        if (rc) {
-            MBABORT_IF_MB("Can't create backup node for device %s\n", buf2);
-            goto finish;
-        }
-
-        // delete original node
-        if(util_exists(blk_device, false)) {
-            rc = unlink(blk_device);
-            if(rc) {
-                MBABORT_IF_MB("Can't delete %s\n", blk_device);
+        if(!replacement->losetup_done) {
+            if(!replacement->loopfile) {
+                MBABORT_IF_MB("loopfile required for %s\n", replacement->loopdevice);
                 goto finish;
             }
-        }
 
-        // stat loop device
-        rc = stat(replacement->loopdevice, &sb_loop);
-        if(rc) {
-            MBABORT_IF_MB("Can't stat device at %s\n", replacement->loopdevice);
-            goto finish;
-        }
-
-        // create new node
-        rc = mknod(blk_device, sb_orig.st_mode, makedev(major(sb_loop.st_rdev), minor(sb_loop.st_rdev)));
-        if (rc) {
-            MBABORT_IF_MB("Can't create replacement node at %s\n", blk_device);
-            goto finish;
-        }
-
-        if(replacement->loopfile) {
             // setup loop device
+            LOGD("losetup %s with %s\n", replacement->loopdevice, replacement->loopfile);
             rc = util_losetup(replacement->loopdevice, replacement->loopfile, false);
             if(rc) {
-                MBABORT_IF_MB("Can't setup loop device at %s for %s\n", blk_device, replacement->loopfile);
+                MBABORT_IF_MB("Can't setup loop device at %s for %s\n", replacement->loopdevice, replacement->loopfile);
                 goto finish;
             }
         }
     }
 
 finish:
-    free(esp_mountpoint);
-
     if(multiboot_data->is_multiboot && rc)
-        MBABORT("postfs init failed: rc=%d errno=%d\n", rc, errno);
+        MBABORT("post-fs-data init failed: rc=%d errno=%d\n", rc, errno);
+}
 
-    // continue trigger-postfs
+static volatile sig_atomic_t mbinit_usr_interrupt = 0;
+static void mbinit_usr_handler(UNUSED int sig, siginfo_t* info, UNUSED void* vp) {
+    // ignore further signals
+    if(mbinit_usr_interrupt)
+        return;
+
+    // get command
+    char* cmd = util_get_file_contents(MBPATH_TRIGGER_CMD);
+    unlink(MBPATH_TRIGGER_CMD);
+    if(!cmd) goto finish;
+
+    LOGI("TRIGGER: %s\n", cmd);
+
+    if(!strcmp(cmd, "early-init")) {
+        handle_on_early_init();
+    }
+    else if(!strcmp(cmd, "post-fs-data")) {
+        handle_on_post_fs_data();
+    }
+
+    // cleanup
+    free(cmd);
+
+finish:
+    // continue sender
     kill(info->si_pid, SIGUSR1);
 }
 
@@ -217,23 +236,162 @@ static int fstab_append(int fd, const char* blk_device, const char* mount_point,
     return 0;
 }
 
+#define SKIP_WHITESPACE(x) while(isspace(*(x))) (x)++;
+#define NEXT_WORD_INTERNAL(str, p) ((p)=strtok_r((str), " \t", &save_ptr))
+#define FIRST_WORD(p) NEXT_WORD_INTERNAL((p), (p))
+#define NEXT_WORD(p) NEXT_WORD_INTERNAL(NULL, (p))
+
+static int process_file(FILE* fp_orig, FILE* fp_out) {
+    char line[PATH_MAX];
+    char *save_ptr;
+    char buf[PATH_MAX];
+
+    while (fgets(line, sizeof(line), fp_orig)) {
+        size_t len = strlen(line);
+
+        // skip incomplete lines
+        if (len && (line[len - 1] != '\n')) {
+            goto write_unmodified;
+        }
+
+        // skip over leading whitespace
+        const char* pcmd = line;
+        SKIP_WHITESPACE(pcmd);
+
+        // we want mount commands only
+        if(strstr(pcmd, "mount")!=pcmd || !isspace(pcmd[5])) {
+            goto write_unmodified;
+        }
+
+        /* mount <type> <device> <path> <flags ...> <options> */
+
+        // create a copy, and keep a pointer to the start
+        char* p_start = strdup(pcmd);
+        char* p = p_start;
+
+        // remove newline
+        p_start[strlen(p_start) - 1] = 0;
+
+        // 'mount'
+        if(!FIRST_WORD(p)) goto write_unmodified;
+
+        // type
+        if(!NEXT_WORD(p)) goto write_unmodified;
+        char* type = strdup(p);
+
+        // device
+        if(!NEXT_WORD(p)) goto write_unmodified;
+        UNUSED char* device = strdup(p);
+
+        // path
+        if(!NEXT_WORD(p)) goto write_unmodified;
+        char* path = strdup(p);
+
+        // flags and options
+        const char* rest = pcmd + (save_ptr-p_start);
+
+        // get uevent block for this device
+        uevent_block_t* uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, device);
+        if(!uevent_block) goto write_unmodified;
+
+        // get replacement for this device
+        part_replacement_t* replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
+        if(!replacement) goto write_unmodified;
+        multiboot_partition_t* part = replacement->multiboot.part;
+
+        const char* blk_device;
+        const char* mnt_flags = rest;
+        // determine mount args
+        if(part->type==MBPART_TYPE_BIND) {
+            blk_device = replacement->multiboot.partpath;
+            mnt_flags = "bind";
+        }
+        else {
+            blk_device = replacement->loopdevice;
+        }
+
+        // write modified command
+        fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, mnt_flags);
+
+        // bind mount datamedia
+        if(!strcmp(path, "/data")) {
+            SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", path, multiboot_data->datamedia_target);
+
+            LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
+            fprintf(fp_out, "    mount %s %s %s %s\n", type, multiboot_data->datamedia_source, buf, "bind");
+        }
+
+        // next entry
+        continue;
+
+        // write unmodified command
+write_unmodified:
+        fputs(line, fp_out);
+    }
+
+    return 0;
+}
+
+static int patch_rc_files(void) {
+    DIR *dp;
+    struct dirent *ep;
+    char buf[PATH_MAX];
+
+    dp = opendir("/");
+    if (dp != NULL) {
+        while ((ep=readdir (dp))) {
+            if(!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
+                continue;
+
+            if(strcmp(util_get_file_extension(ep->d_name), "rc"))
+                continue;
+
+            // rename original file
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s.orig", ep->d_name);
+            rename(ep->d_name, buf);
+
+            // open original file
+            FILE* fp_orig = fopen(buf, "r");
+            if(!fp_orig) MBABORT("can't open %s: %s\n", buf, strerror(errno));
+
+            // open output file
+            FILE* fp_out = fopen(ep->d_name, "w");
+            if(!fp_out) MBABORT("can't open %s: %s\n", ep->d_name, strerror(errno));
+
+            // process file
+            LOGV("process: %s\n", ep->d_name);
+            process_file(fp_orig, fp_out);
+
+            // close files
+            fclose(fp_out);
+            fclose(fp_orig);
+
+            // set permissions for patched file
+            chmod(ep->d_name, 0750);
+
+            // delete original file
+            unlink(buf);
+        }
+        closedir (dp);
+    }
+    else {
+        MBABORT("Can't open root directory: %s\n", strerror(errno));
+    }
+
+    return 0;
+}
+
 int boot_android(void) {
     multiboot_data = multiboot_get_data();
 
     int rc;
     int i;
     char buf[PATH_MAX];
-    char buf2[PATH_MAX];
-
-    util_setup_partition_replacements();
 
     // multiboot setup
     if(multiboot_data->is_multiboot) {
-        // get directory of multiboot.ini
-        char* basedir = util_dirname(multiboot_data->path);
-        if(!basedir) {
-            MBABORT("Can't get base dir for multiboot path\n");
-        }
+        // patch all rc files
+        patch_rc_files();
 
         // open fstab for writing
         int fd = open(multiboot_data->romfstabpath, O_WRONLY|O_TRUNC);
@@ -242,55 +400,46 @@ int boot_android(void) {
         }
 
         // write entries
-        int processed_data = 0;
+        struct fstab_rec *datarec = NULL;
         for(i=0; i<multiboot_data->romfstab->num_entries; i++) {
-            struct fstab_rec *rec;
-            rec = &multiboot_data->romfstab->recs[i];
-            int is_data = !strcmp(rec->mount_point, "/data");
+            struct fstab_rec *rec = &multiboot_data->romfstab->recs[i];
+            const char* blk_device = rec->blk_device;
+            const char* mnt_flags = rec->mnt_flags_orig;
 
-            // this is a workaround for /data having two entries: for ext4 and f2fs
-            // while double-mounting it doesn't seem to break sth. it doesn't looks good either
-            if(is_data && processed_data)
-                continue;
+            // get uevent block for this device
+            uevent_block_t* uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+            if(!uevent_block) goto write_entry;
 
-            // get multiboot part
-            // TODO: use blkdevice
-            multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
-            if(part) {
-                const char* blk_device;
-                const char* mnt_flags = rec->mnt_flags_orig;
+            // get replacement for this device
+            part_replacement_t* replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
+            if(!replacement) goto write_entry;
+            multiboot_partition_t* part = replacement->multiboot.part;
 
-                // build path
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-
-                if(part->type==MBPART_TYPE_BIND) {
-                    blk_device = buf;
-                    mnt_flags = "bind";
-                }
-                else {
-                    // build loop path
-                    SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_DEV"/block/loopdev:%s", part->name);
-                    blk_device = buf2;
-                }
-
-                fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
-
-                // bind mount datamedia
-                if(part->type==MBPART_TYPE_BIND && is_data) {
-                    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", rec->mount_point, multiboot_data->datamedia_target);
-
-                    LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
-                    fstab_append(fd, multiboot_data->datamedia_source, buf, rec->fs_type, "bind", "defaults");
-                }
-
-                if(is_data)
-                    processed_data = 1;
+            // determine mount args
+            if(part->type==MBPART_TYPE_BIND) {
+                blk_device = replacement->multiboot.partpath;
+                mnt_flags = "bind";
             }
-
             else {
-                // write unmodified entry
-                fstab_append(fd, rec->blk_device, rec->mount_point, rec->fs_type, rec->mnt_flags_orig, rec->fs_mgr_flags_orig);
+                blk_device = replacement->loopdevice;
             }
+
+            // write entry
+write_entry:
+            fstab_append(fd, blk_device, rec->mount_point, rec->fs_type, mnt_flags, rec->fs_mgr_flags_orig);
+
+            // save rec for /data
+            if(!strcmp(rec->mount_point, "/data")) {
+                datarec = rec;
+            }
+        }
+
+        // bind mount datamedia
+        if(datarec) {
+            SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", datarec->mount_point, multiboot_data->datamedia_target);
+
+            LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
+            fstab_append(fd, multiboot_data->datamedia_source, buf, datarec->fs_type, "bind", "defaults");
         }
 
         // close file
@@ -313,29 +462,50 @@ int boot_android(void) {
 
     // child
     else {
-        // add post-fs-data event
+        // add trigger events
         SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
-                 "on post-fs-data\n"
-                 "    start mbpostfs\n"
-                 "    wait "POSTFS_NOTIFICATION_FILE"\n"
+                 "on early-init\n"
+                 // wait for coldboot
+                 "    wait /dev/.coldboot_done\n"
                  "\n"
-                 "service mbpostfs "MBPATH_TRIGGER_POSTFS_DATA" %u\n"
+
+                 // start mbtrigger
+                 "    write "MBPATH_TRIGGER_CMD" early-init\n"
+                 "    start mbtrigger\n"
+                 "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+
+                 // mbtrigger cleanup
+                 "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+
+
+                 "on post-fs-data\n"
+                 // start mbtrigger
+                 "    write "MBPATH_TRIGGER_CMD" post-fs-data\n"
+                 "    start mbtrigger\n"
+                 "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+
+                 // mbtrigger cleanup
+                 "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+                 "\n"
+
+                // trigger service
+                 "service mbtrigger "MBPATH_TRIGGER_BIN" %u\n"
                  "    disabled\n"
                  "    oneshot\n"
-                 "\n",
+                 "\n"
 
-                 getpid()
+                 , getpid()
                 );
         rc = util_append_string_to_file("/init.rc", buf);
         if(rc) return rc;
 
-        // install postfs handler
+        // install trigger handler
         util_setsighandler(SIGUSR1, mbinit_usr_handler);
 
         // continue init
         kill(getppid(), SIGUSR1);
 
-        // wait for postfs
+        // wait for trigger
         WAIT_FOR_SIGNAL(SIGUSR1, !mbinit_usr_interrupt);
 
         // we are not allowed to return

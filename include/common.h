@@ -49,10 +49,11 @@
 #define MBPATH_MB_SYSTEM MBPATH_ROOT "/mb_system"
 #define MBPATH_MB_DATA MBPATH_ROOT "/mb_data"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
-#define MBPATH_TRIGGER_POSTFS_DATA MBPATH_BIN "/trigger-postfs-data"
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
 #define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"
-#define POSTFS_NOTIFICATION_FILE "/dev/.trigger-postfs-data"
+#define MBPATH_TRIGGER_BIN "/trigger"
+#define MBPATH_TRIGGER_CMD "/multiboot/.trigger_cmd"
+#define MBPATH_TRIGGER_WAIT_FILE "/multiboot/.trigger_wait"
 
 #define UNUSED __attribute__((unused))
 
@@ -67,19 +68,14 @@ typedef enum {
 typedef struct {
     char* name;
     char* path;
+
     multiboot_partition_type_t type;
+    uevent_block_t* uevent_block;
 } multiboot_partition_t;
 
 typedef struct {
-    // boot device
-    char* guid;
-    char* path;
-    uevent_block_t* bootdev;
     int is_multiboot;
     int is_recovery;
-    int bootdev_supports_bindmount;
-    multiboot_partition_t* mbparts;
-    uint32_t num_mbparts;
 
     // ESP
     struct fstab_rec* esp;
@@ -95,6 +91,18 @@ typedef struct {
     // partition replacement list
     list_node_t replacements;
 
+    // only available during multiboot
+
+    // boot device
+    char* guid;
+    char* path;
+    uevent_block_t* bootdev;
+    int bootdev_supports_bindmount;
+
+    // multiboot.ini data
+    multiboot_partition_t* mbparts;
+    uint32_t num_mbparts;
+
     // datamedia
     uint32_t native_data_layout_version;
     const char* datamedia_source;
@@ -105,23 +113,21 @@ typedef struct {
     list_node_t node;
     pthread_mutex_t lock;
 
-    struct fstab_rec* rec;
-    unsigned major;
-    unsigned minor;
+    uevent_block_t* uevent_block;
 
     // raw part for loop, stub part for bind
     char* loopdevice;
-    // set if the losetup hasn't been done yet
     char* loopfile;
+    int losetup_done;
+    // optional, file to sync changes to
+    char* loop_sync_target;
 
-    union {
-        struct {
-            multiboot_partition_t* part;
+    struct {
+        multiboot_partition_t* part;
 
-            // bind
-            char* partpath;
-        } multiboot;
-    } u;
+        // bind
+        char* partpath;
+    } multiboot;
 } part_replacement_t;
 
 

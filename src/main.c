@@ -35,7 +35,7 @@ static void synch_signal(UNUSED int sig, UNUSED siginfo_t* info, UNUSED void* vp
     usr_interrupt = 1;
 }
 
-int trigger_postfsdata_main(int argc, char** argv) {
+int trigger_main(int argc, char** argv) {
     if(argc!=2)
         return -EINVAL;
 
@@ -53,7 +53,7 @@ int trigger_postfsdata_main(int argc, char** argv) {
     WAIT_FOR_SIGNAL(SIGUSR1, !usr_interrupt);
 
     // tell init to continue (it waits for this file)
-    int fd = open(POSTFS_NOTIFICATION_FILE, O_RDWR|O_CREAT);
+    int fd = open(MBPATH_TRIGGER_WAIT_FILE, O_RDWR|O_CREAT);
     if(fd) close(fd);
 
     return 0;
@@ -69,8 +69,8 @@ int main(int argc, char** argv) {
 
     if(!strcmp(progname, "init.multiboot")) {
         if(argc>=2) {
-            if(!strcmp(argv[1], "trigger-postfs-data")) {
-                return trigger_postfsdata_main(argc-1, argv+1);
+            if(!strcmp(argv[1], "trigger")) {
+                return trigger_main(argc-1, argv+1);
             }
             else if(!strcmp(argv[1], "mke2fs")) {
                 return mke2fs_main(argc-1, argv+1);
@@ -88,8 +88,8 @@ int main(int argc, char** argv) {
             MBABORT("multiboot_main returned\n");
         }
     }
-    else if(!strcmp(progname, "trigger-postfs-data")) {
-        return trigger_postfsdata_main(argc, argv);
+    else if(!strcmp(progname, "trigger")) {
+        return trigger_main(argc, argv);
     }
     else if(!strcmp(progname, "mke2fs")) {
         return mke2fs_main(argc, argv);

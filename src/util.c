@@ -492,7 +492,7 @@ char* util_get_espdir(const char* mountpoint) {
     return safe_strdup(buf);
 }
 
-char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *rec) {
+char* util_get_esp_path_for_partition(const char* mountpoint, const char* name) {
     int rc;
     char buf[PATH_MAX];
     char buf2[PATH_MAX];
@@ -512,16 +512,8 @@ char* util_get_esp_path_for_partition(const char* mountpoint, struct fstab_rec *
         return NULL;
     }
 
-    // build partition name
-    char* name = util_basename(rec->mount_point);
-    if(!name) {
-        LOGE("Can't get basename of %s\n", rec->mount_point);
-        return NULL;
-    }
-
     // create path for loop image
     rc = snprintf(buf2, sizeof(buf2), "%s/partition_%s.img", buf, name);
-    free(name);
     if(SNPRINTF_ERROR(rc, sizeof(buf2))) {
         LOGE("snprintf error\n");
         return NULL;
@@ -590,42 +582,6 @@ int util_fs_supports_multiboot_bind(const char* type) {
     return 0;
 }
 
-char* util_device_from_mbname(const char* name) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
-
-    int i;
-    char buf[PATH_MAX];
-
-    for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
-        struct fstab_rec *rec = &multiboot_data->mbfstab->recs[i];
-
-        if(!strcmp(rec->mount_point+1, name)) {
-            uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
-            if (!bi) return NULL;
-
-            SAFE_SNPRINTF_RET(LOGE, NULL, buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
-
-            return safe_strdup(buf);
-        }
-    }
-
-    return NULL;
-}
-
-multiboot_partition_t* util_mbpart_by_name(const char* name) {
-    uint32_t i;
-    multiboot_data_t* multiboot_data = multiboot_get_data();
-
-    for(i=0; i<multiboot_data->num_mbparts; i++) {
-        multiboot_partition_t* part = &multiboot_data->mbparts[i];
-
-        if(!strcmp(part->name, name))
-            return part;
-    }
-
-    return NULL;
-}
-
 int util_mount_esp(int abort_on_error) {
     int rc;
     multiboot_data_t* multiboot_data = multiboot_get_data();
@@ -688,468 +644,6 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
     free(source);
 
     return rc;
-}
-
-static uint32_t util_get_mb_sdk_version(void) {
-    const char* systempath;
-    char buf[PATH_MAX];
-    ssize_t bytecount;
-    int rc;
-
-    part_replacement_t* replacement = util_get_replacement_by_name("system");
-    if(!replacement) {
-        MBABORT("Can't find replacement partition for system\n");
-    }
-
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
-        // mount system
-        rc = util_mount(replacement->loopdevice, MBPATH_MB_SYSTEM, NULL, 0, NULL);
-        if(rc) {
-            MBABORT("Can't mount system: %s\n", strerror(errno));
-        }
-
-        systempath = MBPATH_MB_SYSTEM;
-    }
-    else {
-        systempath = replacement->u.multiboot.partpath;
-    }
-
-    // read sdk version
-    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/build.prop", systempath);
-    char* prop = util_get_property(buf, "ro.build.version.sdk");
-    if(!prop) {
-        MBABORT("Can't read property from %s: %s\n", buf, strerror(errno));
-    }
-
-    // convert sdk version to int
-    uint32_t sdk_version;
-    bytecount = sscanf(prop, "%u", &sdk_version);
-    free(prop);
-    if (bytecount != 1) {
-        MBABORT("Can't convert\n");
-    }
-
-    // unmount system
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
-        SAFE_UMOUNT(MBPATH_MB_SYSTEM);
-    }
-
-    return sdk_version;
-}
-
-static void util_prepare_multiboot_data(void) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
-    int rc;
-    uint32_t sdk_version;
-    const char* datapath;
-    char buf[PATH_MAX];
-
-    // get sdk version
-    sdk_version = util_get_mb_sdk_version();
-    LOGI("SDK version: %u\n", sdk_version);
-
-    // determine required layout version
-    uint32_t layout_version_needed;
-    if(sdk_version<17)
-        layout_version_needed = 0;
-    else if(sdk_version<20)
-        layout_version_needed = 2;
-    else
-        layout_version_needed = 3;
-
-    // get data replacement
-    part_replacement_t* replacement = util_get_replacement_by_name("data");
-    if(!replacement) {
-        MBABORT("Can't find replacement partition for data\n");
-    }
-
-    // mount data partition
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
-        // mount system
-        rc = util_mount(replacement->loopdevice, MBPATH_MB_DATA, NULL, 0, NULL);
-        if(rc) {
-            MBABORT("Can't mount data: %s\n", strerror(errno));
-        }
-
-        datapath = MBPATH_MB_DATA;
-    }
-    else {
-        datapath = replacement->u.multiboot.partpath;
-    }
-
-    // get layout version
-    uint32_t layout_version;
-    SAFE_SNPRINTF_RET(LOGE, , buf, sizeof(buf), "%s/.layout_version", datapath);
-    rc = util_read_int(buf, &layout_version);
-    if(rc) {
-        layout_version = 0;
-    }
-    LOGI("MB layout_version: %u\n", layout_version);
-
-    // determine bind-mount mapping
-    const char* datamedia_source = NULL;
-    const char* datamedia_target = NULL;
-    if(ANYEQ_2(multiboot_data->native_data_layout_version, 0, 1))
-        datamedia_source = MBPATH_DATA"/media";
-    else if(ANYEQ_2(multiboot_data->native_data_layout_version, 2, 3))
-        datamedia_source = MBPATH_DATA"/media/0";
-    if(ANYEQ_2(layout_version_needed, 0, 1))
-        datamedia_target = "/media";
-    else if(ANYEQ_2(layout_version_needed, 2, 3))
-        datamedia_target = "/media/0";
-
-    // verify results
-    if(datamedia_source==NULL || datamedia_target==NULL) {
-        MBABORT("datamedia_source=%s datamedia_target=%s\n", datamedia_source?:"(null)", datamedia_target?:"(null)");
-    }
-
-    // upgrade/downgrade target layout version
-    if(layout_version>0 && layout_version_needed>0 && layout_version!=layout_version_needed) {
-        rc = util_write_int(buf, layout_version_needed);
-        if(rc) {
-            MBABORT("can't set layout version to %u\n", layout_version_needed);
-        }
-    }
-
-    // create mount source directory
-    if(!util_exists(datamedia_source, false)) {
-        rc = util_mkdir(datamedia_source);
-        if(rc) {
-            MBABORT("Can't create datamedia on source: %s\n", strerror(rc));
-        }
-    }
-
-    // create mount target directory
-    SAFE_SNPRINTF_RET(LOGE, , buf, sizeof(buf), MBPATH_MB_DATA"%s", datamedia_target);
-    if(!util_exists(buf, false)) {
-        rc = util_mkdir(buf);
-        if(rc) {
-            MBABORT("Can't create datamedia on target: %s\n", strerror(rc));
-        }
-    }
-
-    multiboot_data->datamedia_target = datamedia_target;
-    multiboot_data->datamedia_source = datamedia_source;
-
-    if(replacement->u.multiboot.part->type==MBPART_TYPE_LOOP) {
-        SAFE_UMOUNT(MBPATH_MB_DATA);
-    }
-}
-
-int util_setup_partition_replacements(void) {
-    multiboot_data_t* multiboot_data = multiboot_get_data();
-
-    int rc;
-    int i;
-    char buf[PATH_MAX];
-    char buf2[PATH_MAX];
-
-    // multiboot
-    if(multiboot_data->is_multiboot) {
-        // get directory of multiboot.ini
-        char* basedir = util_dirname(multiboot_data->path);
-        if(!basedir) {
-            MBABORT("Can't get base dir for multiboot path\n");
-        }
-
-        // make sure we have /dev/fuse
-        if(!util_exists("/dev", false)) {
-            rc = util_mkdir("/dev");
-            if(rc) {
-                MBABORT("Can't create /dev directory\n");
-            }
-        }
-        if(!util_exists("/dev/fuse", true)) {
-            rc = mknod("/dev/fuse", S_IFCHR | 0600, makedev(10, 229));
-            if(rc) {
-                MBABORT("Can't create /dev/fuse: %s\n", strerror(errno));
-            }
-        }
-
-        // setup multiboot partitions
-        for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
-            struct fstab_rec *rec;
-
-            // skip non-multiboot partitions
-            rec = &multiboot_data->mbfstab->recs[i];
-            if(!fs_mgr_is_multiboot(rec)) continue;
-
-            // get multiboot part
-            multiboot_partition_t* part = util_mbpart_by_name(rec->mount_point+1);
-            if(!part) {
-                MBABORT("Partition '%s' wasn't found in multiboot.ini\n", rec->mount_point+1);
-            }
-
-            // get blockinfo
-            uevent_block_t *bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
-            if(!bi) {
-                MBABORT("Can't get blockinfo for '%s'\n", rec->blk_device);
-            }
-
-            // path to multiboot rom dir
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BOOTDEV"%s/%s", basedir, part->path);
-            char* partpath = safe_strdup(buf);
-
-            // path to loop device
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", part->name);
-            char* loopdevice = safe_strdup(buf);
-
-            // stat path
-            struct stat sb;
-            rc = lstat(partpath, &sb);
-            if(rc) rc = -errno;
-            if(rc && rc!=-ENOENT) {
-                MBABORT("Can't stat '%s'\n", partpath);
-            }
-
-            // check node type
-            if(!rc && (
-                        (part->type==MBPART_TYPE_BIND && !S_ISDIR(sb.st_mode)) ||
-                        (part->type!=MBPART_TYPE_BIND && !S_ISREG(sb.st_mode))
-                    )
-              ) {
-                MBABORT("path '%s'(type=%d) has invalid mode: %x\n", partpath, part->type, sb.st_mode);
-            }
-
-            // get real device
-            char* device = util_device_from_mbname(part->name);
-            if(!device) {
-                MBABORT("Can't get device for '%s'\n", part->name);
-            }
-
-            if(part->type==MBPART_TYPE_BIND) {
-                // create directory
-                if(rc==-ENOENT) {
-                    rc = util_mkdir(partpath);
-                    if(rc) {
-                        MBABORT("Can't create directory '%s'\n", partpath);
-                    }
-                }
-
-                // get size of original partition
-                unsigned long num_blocks = 0;
-                rc = util_block_num(device, &num_blocks);
-                if(rc || num_blocks==0) {
-                    MBABORT("Can't get size of device %s\n", rec->blk_device);
-                }
-
-                // mkfs needs much time for large filesystems, so just use max 200MB
-                num_blocks = MIN(num_blocks, (200*1024*1024)/512llu);
-
-                // path to dynfilefs mountpopint
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/dynmount:%s", part->name);
-
-                // path to dynfilefs storage file
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_ROOT"/dynstorage:%s", part->name);
-
-                // mount dynfilefs
-                rc = util_dynfilefs(buf, buf2, num_blocks*512llu);
-                if(rc) {
-                    MBABORT("can't mount dynfilefs\n");
-                }
-
-                // path to stub partition backup (in dynfs mountpoint)
-                SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s/loop.fs", buf2);
-
-                // create new loop node
-                rc = util_make_loop(loopdevice);
-                if(rc) {
-                    MBABORT("Can't create loop device at %s\n", loopdevice);
-                }
-
-                // setup loop device
-                rc = util_losetup(loopdevice, buf, false);
-                if(rc) {
-                    MBABORT("Can't setup loop device at %s for %s\n", loopdevice, buf);
-                }
-
-                // get fstype
-                const char* fstype = "ext4";
-
-                // create filesystem on loop device
-                rc = util_mkfs(loopdevice, fstype);
-                if(rc) {
-                    MBABORT("Can't create '%s' filesystem on %s\n", fstype, loopdevice);
-                }
-
-                // mount loop device
-                SAFE_MOUNT(loopdevice, MBPATH_STUB, fstype, 0, NULL);
-
-                // create id file
-                int fd = open(MBPATH_STUB_IDFILE, O_RDWR|O_CREAT);
-                if(fd<0) {
-                    MBABORT("Can't create ID file\n");
-                }
-                close(fd);
-
-                // unmount loop device
-                SAFE_UMOUNT(MBPATH_STUB);
-            }
-
-            else if(part->type==MBPART_TYPE_LOOP) {
-                // create new node
-                rc = util_make_loop(loopdevice);
-                if(rc) {
-                    MBABORT("Can't create loop device at %s\n", loopdevice);
-                }
-
-                // setup loop device
-                rc = util_losetup(loopdevice, partpath, false);
-                if(rc) {
-                    MBABORT("Can't setup loop device at %s for %s\n", loopdevice, partpath);
-                }
-            }
-
-            else {
-                LOGF("invalid partition type: %d\n", part->type);
-            }
-
-            part_replacement_t* pdata = safe_calloc(sizeof(part_replacement_t), 1);
-            if(!pdata) {
-                MBABORT("Can't allocate hook device\n");
-            }
-
-            pthread_mutex_init(&pdata->lock, NULL);
-            pdata->major = bi->major;
-            pdata->minor = bi->minor;
-            pdata->loopdevice = loopdevice;
-            pdata->rec = rec;
-            pdata->u.multiboot.part = part;
-            pdata->u.multiboot.partpath = partpath;
-
-            list_add_tail(&multiboot_data->replacements, &pdata->node);
-        }
-
-        // TODO: check for optional replacement partitions
-
-        free(basedir);
-
-        // prepare datamedia setup
-        if(!multiboot_data->is_recovery) {
-            util_prepare_multiboot_data();
-        }
-    }
-
-    // internal system
-
-    // mount ESP
-    util_mount_esp(1);
-
-    // get espdir
-    char* espdir = util_get_espdir(MBPATH_ESP);
-    if(!espdir) {
-        MBABORT("Can't get ESP directory: %s\n", strerror(errno));
-    }
-
-    // copy path
-    SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), "%s", espdir);
-
-    // create UEFIESP directory
-    if(!util_exists(buf, true)) {
-        rc = util_mkdir(buf);
-        if(rc) {
-            MBABORT("Can't create directory at %s\n", buf);
-        }
-    }
-
-    for(i=0; i<multiboot_data->mbfstab->num_entries; i++) {
-        struct fstab_rec *rec = &multiboot_data->mbfstab->recs[i];
-
-        // skip non-uefi partitions
-        if(!fs_mgr_is_uefi(rec)) continue;
-        // this partition got replaced by multiboot aready
-        if(fs_mgr_is_multiboot(rec) && multiboot_data->is_multiboot) continue;
-
-        // get blockinfo
-        uevent_block_t* bi = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
-        if(!bi) {
-            MBABORT("Can't get blockinfo\n");
-        }
-
-        // get ESP filename
-        char* espfilename = util_get_esp_path_for_partition(MBPATH_ESP, rec);
-        if(!espfilename) {
-            MBABORT("Can't get filename\n");
-        }
-
-        // get real device in MBPATH_DEV
-        char* mbpathdevice = util_getmbpath_from_device(rec->blk_device);
-        if(!mbpathdevice) {
-            MBABORT("Can't get mbpath device\n");
-        }
-
-        // create partition image on ESP (in case it doesn't exist)
-        rc = util_create_partition_backup(mbpathdevice, espfilename);
-        if(rc) {
-            MBABORT("Can't create partition image\n");
-        }
-
-        // path to loop device
-        SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_DEV"/block/loopdev:%s", rec->mount_point+1);
-
-        // in native recovery, we don't want to block unmounting by setting up loop's
-        if(multiboot_data->is_recovery && !multiboot_data->is_multiboot) {
-            // path to temporary partition backup
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_ROOT"/loopfile:%s", rec->mount_point+1);
-
-            // create temporary partition backup
-            rc = util_cp(espfilename, buf2);
-            if(rc) {
-                MBABORT("Can't copy partition from esp to temp\n");
-            }
-        }
-
-        else {
-            // path to partition backup
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), "%s", espfilename);
-        }
-
-        // create new loop node
-        rc = util_make_loop(buf);
-        if(rc) {
-            MBABORT("Can't create loop device at %s\n", buf);
-        }
-
-        char* loopfile = NULL;
-        // in Android we'll do that in the postfs stage
-        if(multiboot_data->is_recovery) {
-            // setup loop device
-            rc = util_losetup(buf, buf2, false);
-            if(rc) {
-                MBABORT("Can't setup loop device at %s for %s\n", buf, buf2);
-            }
-        }
-        else {
-            loopfile = safe_strdup(buf2);
-        }
-
-        part_replacement_t* pdata = safe_calloc(sizeof(part_replacement_t), 1);
-        if(!pdata) {
-            MBABORT("Can't allocate hook device\n");
-        }
-
-        pthread_mutex_init(&pdata->lock, NULL);
-        pdata->major = bi->major;
-        pdata->minor = bi->minor;
-        pdata->loopdevice = safe_strdup(buf);
-        pdata->loopfile = loopfile?safe_strdup(loopfile):NULL;
-        pdata->rec = rec;
-
-        list_add_tail(&multiboot_data->replacements, &pdata->node);
-
-        // cleanup
-        free(mbpathdevice);
-        free(espfilename);
-    }
-
-    // in native recovery, we don't want to block unmounting
-    // in android recovery, we re-mount the esp in the postfs stage
-    if(!multiboot_data->is_recovery || (multiboot_data->is_recovery && !multiboot_data->is_multiboot)) {
-        // unmount ESP
-        SAFE_UMOUNT(MBPATH_ESP);
-    }
-
-    return 0;
 }
 
 int util_mount_blockinfo_with_romflags(uevent_block_t* bi, const char* mountpoint) {
@@ -1304,7 +798,62 @@ part_replacement_t* util_get_replacement_by_name(const char* name) {
 
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if(replacement->u.multiboot.part && !strcmp(replacement->u.multiboot.part->name, name)) {
+        if(replacement->multiboot.part && !strcmp(replacement->multiboot.part->name, name)) {
+            return replacement;
+        }
+    }
+    return NULL;
+}
+
+const char *util_get_file_extension(const char *filename) {
+    const char *dot = strrchr(filename, '.');
+    if(!dot || dot == filename) return "";
+    return dot + 1;
+}
+
+char* util_get_file_contents(const char* filename) {
+    char *buffer = NULL;
+
+    // open file
+    FILE *fh = fopen(filename, "rb");
+    if(!fh) return NULL;
+
+    // get file size
+    fseek(fh, 0L, SEEK_END);
+    long size = ftell(fh);
+    rewind(fh);
+
+    // allocate buffer
+    buffer = malloc(size+1);
+    if (!buffer) {
+        goto close_file;
+    }
+
+    // read file
+    if(fread(buffer, size, 1, fh)!=1) {
+        goto free_buffer;
+    }
+
+    buffer[size] = 0;
+
+    goto close_file;
+
+free_buffer:
+    free(buffer);
+    buffer = NULL;
+
+close_file:
+    fclose(fh);
+
+    return buffer;
+}
+
+part_replacement_t* util_get_replacement(unsigned int major, unsigned int minor) {
+    multiboot_data_t* multiboot_data = multiboot_get_data();
+
+    part_replacement_t *replacement;
+    list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
+        if(replacement->uevent_block->major==major && replacement->uevent_block->minor==minor) {
             return replacement;
         }
     }

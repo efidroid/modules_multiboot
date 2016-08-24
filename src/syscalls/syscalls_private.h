@@ -39,7 +39,6 @@ void fdtable_free(fdtable_t* fdtable);
 
 int lindev_from_path(const char* filename, unsigned* major, unsigned* minor, int resolve_symlinks);
 int lindev_from_mountpoint(const char* mountpoint, unsigned* major, unsigned* minor);
-part_replacement_t* syshook_get_replacement(unsigned int major, unsigned int minor);
 
 char* syshookutils_child_getcwd(syshook_process_t* process, char* buf, size_t size);
 void __user * syshookutils_copy_to_child(syshook_process_t* process, void* buf, size_t size);
