@@ -270,7 +270,7 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
         /* mount <type> <device> <path> <flags ...> <options> */
 
         // create a copy, and keep a pointer to the start
-        char *p_start = strdup(pcmd);
+        char *p_start = safe_strdup(pcmd);
         char *p = p_start;
 
         // remove newline
@@ -281,15 +281,15 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
 
         // type
         if (!NEXT_WORD(p)) goto write_unmodified;
-        char *type = strdup(p);
+        char *type = safe_strdup(p);
 
         // device
         if (!NEXT_WORD(p)) goto write_unmodified;
-        UNUSED char *device = strdup(p);
+        UNUSED char *device = safe_strdup(p);
 
         // path
         if (!NEXT_WORD(p)) goto write_unmodified;
-        char *path = strdup(p);
+        char *path = safe_strdup(p);
 
         // flags and options
         const char *rest = pcmd + (save_ptr-p_start);
