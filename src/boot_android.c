@@ -306,7 +306,7 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
         const char *blk_device;
         const char *mnt_flags = rest;
         // determine mount args
-        if (part->type==MBPART_TYPE_BIND) {
+        if (part && part->type==MBPART_TYPE_BIND) {
             blk_device = replacement->multiboot.partpath;
             mnt_flags = "bind";
         } else {
@@ -420,7 +420,7 @@ int boot_android(void)
             multiboot_partition_t *part = replacement->multiboot.part;
 
             // determine mount args
-            if (part->type==MBPART_TYPE_BIND) {
+            if (part && part->type==MBPART_TYPE_BIND) {
                 blk_device = replacement->multiboot.partpath;
                 mnt_flags = "bind";
             } else {
