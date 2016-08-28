@@ -266,6 +266,7 @@ int util_mount(const char *source, const char *target,
 
     // mount
     rc = mount(source, target, filesystemtype, mountflags, data);
+    LOGV("mount(%s, %s, %s, %lu, %p) = %d\n", source, target, filesystemtype, mountflags, data, rc);
     if (rc) {
         LOGE("mount(%s, %s, %s, %lu, %p) failed: %s\n", source, target, filesystemtype, mountflags, data, strerror(errno));
         return -1;
