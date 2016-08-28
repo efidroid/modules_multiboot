@@ -193,6 +193,12 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         // mount directly
         ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
         LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
+
+        // remount to apply requested mount-flags
+        if(ret==0) {
+            ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND|MS_REMOUNT|flags, data);
+            LOGV("%s: bind re-mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
+        }
         return ret;
     }
 

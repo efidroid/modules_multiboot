@@ -34,7 +34,15 @@
 #define LOG_TAG "BOOT_ANDROID"
 #include <lib/log.h>
 
+typedef struct {
+    list_node_t node;
+
+    struct fstab_rec *rec;
+    part_replacement_t *replacement;
+} remount_entry_t;
+
 static multiboot_data_t *multiboot_data = NULL;
+static list_node_t remount_entries = LIST_INITIAL_VALUE(remount_entries);
 
 #define MBABORT_IF_MB(fmt, ...) do { \
     if(multiboot_data->is_multiboot) \
@@ -133,7 +141,7 @@ static void handle_on_post_fs_data(void)
     if (!volume) {
         LOGI("ESP is not mounted. do this now.\n");
 
-        // bind-mount ESP to our dir
+        // mount ESP to our dir
         rc = util_mount_esp(multiboot_data->is_multiboot);
         if (rc) {
             MBABORT_IF_MB("Can't mount ESP: %s\n", strerror(errno));
@@ -176,6 +184,21 @@ finish:
         MBABORT("post-fs-data init failed: rc=%d errno=%d\n", rc, errno);
 }
 
+static void add_remount_entry(struct fstab_rec *rec, part_replacement_t *replacement) {
+    remount_entry_t* entry = safe_malloc(sizeof(remount_entry_t));
+    entry->rec = rec;
+    entry->replacement = replacement;
+    list_add_tail(&remount_entries, &entry->node);
+}
+
+static void handle_on_post_fstab(void)
+{
+    remount_entry_t *entry;
+    list_for_every_entry(&remount_entries, entry, remount_entry_t, node) {
+        SAFE_MOUNT(entry->replacement->multiboot.partpath, entry->rec->mount_point, entry->rec->fs_type, MS_REMOUNT|MS_BIND|entry->rec->flags, entry->rec->fs_options);
+    }
+}
+
 static volatile sig_atomic_t mbinit_usr_interrupt = 0;
 static void mbinit_usr_handler(UNUSED int sig, siginfo_t *info, UNUSED void *vp)
 {
@@ -194,6 +217,8 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t *info, UNUSED void *vp)
         handle_on_early_init();
     } else if (!strcmp(cmd, "post-fs-data")) {
         handle_on_post_fs_data();
+    } else if (!strcmp(cmd, "post-fstab")) {
+        handle_on_post_fstab();
     }
 
     // cleanup
@@ -249,9 +274,11 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
     char line[PATH_MAX];
     char *save_ptr;
     char buf[PATH_MAX];
+    const char *pcmd;
 
     while (fgets(line, sizeof(line), fp_orig)) {
         size_t len = strlen(line);
+        pcmd = NULL;
 
         // skip incomplete lines
         if (len && (line[len - 1] != '\n')) {
@@ -259,77 +286,94 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
         }
 
         // skip over leading whitespace
-        const char *pcmd = line;
+        pcmd = line;
         SKIP_WHITESPACE(pcmd);
 
         // we want mount commands only
-        if (strstr(pcmd, "mount")!=pcmd || !isspace(pcmd[5])) {
-            goto write_unmodified;
+        if (strstr(pcmd, "mount")==pcmd && isspace(pcmd[5])) {
+            /* mount <type> <device> <path> <flags ...> <options> */
+
+            // create a copy, and keep a pointer to the start
+            char *p_start = safe_strdup(pcmd);
+            char *p = p_start;
+
+            // remove newline
+            p_start[strlen(p_start) - 1] = 0;
+
+            // 'mount'
+            if (!FIRST_WORD(p)) goto write_unmodified;
+
+            // type
+            if (!NEXT_WORD(p)) goto write_unmodified;
+            char *type = safe_strdup(p);
+
+            // device
+            if (!NEXT_WORD(p)) goto write_unmodified;
+            UNUSED char *device = safe_strdup(p);
+
+            // path
+            if (!NEXT_WORD(p)) goto write_unmodified;
+            char *path = safe_strdup(p);
+
+            // flags and options
+            const char *rest = pcmd + (save_ptr-p_start);
+            SKIP_WHITESPACE(rest);
+
+            // get uevent block for this device
+            uevent_block_t *uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, device);
+            if (!uevent_block) goto write_unmodified;
+
+            // get replacement for this device
+            part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
+            if (!replacement) goto write_unmodified;
+            multiboot_partition_t *part = replacement->multiboot.part;
+
+            const char *blk_device;
+            const char *mnt_flags = rest;
+            // determine mount args
+            if (part && part->type==MBPART_TYPE_BIND) {
+                blk_device = replacement->multiboot.partpath;
+                mnt_flags = "bind";
+            } else {
+                blk_device = replacement->loopdevice;
+            }
+
+            // write modified command
+            fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, mnt_flags);
+
+            // remount to apply requested mount-flags
+            if (part && part->type==MBPART_TYPE_BIND) {
+                SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "remount,bind,%s", rest);
+                fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, buf);
+            }
+
+            // bind mount datamedia
+            if (!strcmp(path, "/data")) {
+                SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", path, multiboot_data->datamedia_target);
+
+                LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
+                fprintf(fp_out, "    mount %s %s %s %s\n", type, multiboot_data->datamedia_source, buf, "bind");
+            }
+
+            // next entry
+            continue;
         }
-
-        /* mount <type> <device> <path> <flags ...> <options> */
-
-        // create a copy, and keep a pointer to the start
-        char *p_start = safe_strdup(pcmd);
-        char *p = p_start;
-
-        // remove newline
-        p_start[strlen(p_start) - 1] = 0;
-
-        // 'mount'
-        if (!FIRST_WORD(p)) goto write_unmodified;
-
-        // type
-        if (!NEXT_WORD(p)) goto write_unmodified;
-        char *type = safe_strdup(p);
-
-        // device
-        if (!NEXT_WORD(p)) goto write_unmodified;
-        UNUSED char *device = safe_strdup(p);
-
-        // path
-        if (!NEXT_WORD(p)) goto write_unmodified;
-        char *path = safe_strdup(p);
-
-        // flags and options
-        const char *rest = pcmd + (save_ptr-p_start);
-
-        // get uevent block for this device
-        uevent_block_t *uevent_block = get_blockinfo_for_path(multiboot_data->blockinfo, device);
-        if (!uevent_block) goto write_unmodified;
-
-        // get replacement for this device
-        part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
-        if (!replacement) goto write_unmodified;
-        multiboot_partition_t *part = replacement->multiboot.part;
-
-        const char *blk_device;
-        const char *mnt_flags = rest;
-        // determine mount args
-        if (part && part->type==MBPART_TYPE_BIND) {
-            blk_device = replacement->multiboot.partpath;
-            mnt_flags = "bind";
-        } else {
-            blk_device = replacement->loopdevice;
-        }
-
-        // write modified command
-        fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, mnt_flags);
-
-        // bind mount datamedia
-        if (!strcmp(path, "/data")) {
-            SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s%s", path, multiboot_data->datamedia_target);
-
-            LOGI("bind-mount %s to %s\n", multiboot_data->datamedia_source, buf);
-            fprintf(fp_out, "    mount %s %s %s %s\n", type, multiboot_data->datamedia_source, buf, "bind");
-        }
-
-        // next entry
-        continue;
 
         // write unmodified command
 write_unmodified:
         fputs(line, fp_out);
+
+        if(pcmd && strstr(pcmd, "mount_all")==pcmd && isspace(pcmd[9])) {
+            fputs("\n"
+                  // start mbtrigger
+                  "    write "MBPATH_TRIGGER_CMD" post-fstab\n"
+                  "    start mbtrigger\n"
+                  "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+
+                  // mbtrigger cleanup
+                  "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+            , fp_out);
+        }
     }
 
     return 0;
@@ -423,6 +467,8 @@ int boot_android(void)
             if (part && part->type==MBPART_TYPE_BIND) {
                 blk_device = replacement->multiboot.partpath;
                 mnt_flags = "bind";
+
+                add_remount_entry(rec, replacement);
             } else {
                 blk_device = replacement->loopdevice;
             }

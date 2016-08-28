@@ -1108,13 +1108,13 @@ int multiboot_main(UNUSED int argc, char **argv)
 
         // mount bootdev
         LOGD("mount boot device\n");
-        rc = util_mount_blockinfo_with_romflags(multiboot_data.bootdev, MBPATH_BOOTDEV);
+        rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, 0, NULL);
         if (rc) {
             MBABORT("Can't mount boot device: %s\n", strerror(errno));
         }
 
         // mount data
-        rc = util_mount_mbinipart_with_romflags("/data", MBPATH_DATA);
+        rc = util_mount_mbinipart("/data", MBPATH_DATA);
         if (rc) {
             MBABORT("Can't mount data: %s\n", strerror(errno));
         }

@@ -602,7 +602,7 @@ int util_mount_esp(int abort_on_error)
     int rc;
     multiboot_data_t *multiboot_data = multiboot_get_data();
 
-    rc = util_mount_blockinfo_with_romflags(multiboot_data->espdev, MBPATH_ESP);
+    rc = uevent_mount(multiboot_data->espdev, MBPATH_ESP, NULL, 0, NULL);
     if (rc) {
         if (abort_on_error)
             MBABORT("Can't mount ESP: %s\n", strerror(errno));
@@ -662,40 +662,7 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
     return rc;
 }
 
-int util_mount_blockinfo_with_romflags(uevent_block_t *bi, const char *mountpoint)
-{
-    multiboot_data_t *multiboot_data = multiboot_get_data();
-    int rc;
-
-    // get the ROM's mount flags
-    unsigned long mountflags = 0;
-    const void *data = NULL;
-    struct fstab_rec *romrec = fs_mgr_get_by_ueventblock(multiboot_data->romfstab, bi);
-    if (romrec) {
-        mountflags = romrec->flags;
-        data = (void *)romrec->fs_options;
-        LOGD("use ROM mountflags for %s, flags:%lu, data:%s\n", bi->devname, mountflags, (const char *)data);
-    }
-
-    // mount data
-    LOGD("mount %s at %s\n", bi->devname, mountpoint);
-    rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
-    if (rc) {
-        // mount without flags
-        LOGI("mount %s without flags\n", bi->devname);
-        mountflags = 0;
-        data = NULL;
-        rc = uevent_mount(bi, mountpoint, NULL, mountflags, data);
-        if (rc) {
-            LOGE("Can't mount %s: %s\n", bi->devname, strerror(errno));
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-int util_mount_mbinipart_with_romflags(const char *name, const char *mountpoint)
+int util_mount_mbinipart(const char *name, const char *mountpoint)
 {
     multiboot_data_t *multiboot_data = multiboot_get_data();
 
@@ -717,7 +684,7 @@ int util_mount_mbinipart_with_romflags(const char *name, const char *mountpoint)
         return -1;
     }
 
-    return util_mount_blockinfo_with_romflags(bi, mountpoint);
+    return uevent_mount(bi, mountpoint, NULL, 0, NULL);
 }
 
 typedef struct {
