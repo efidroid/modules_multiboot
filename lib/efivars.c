@@ -102,8 +102,12 @@ static char *efivar_getdev(void)
     multiboot_data_t *mbdata = multiboot_get_data();
     if (!mbdata || !mbdata->blockinfo) goto err;
 
+    // get fstab rec for nvvars partition
+    struct fstab_rec* rec = fs_mgr_nvvars(mbdata->mbfstab);
+    if (!rec) goto err;
+
     // get block of our partition
-    uevent_block_t *bi = get_blockinfo_for_path(mbdata->blockinfo, DEVICE_NVVARS_PARTITION);
+    uevent_block_t *bi = get_blockinfo_for_path(mbdata->blockinfo, rec->blk_device);
     if (!bi) goto err;
 
     // try EFIVARDEV
