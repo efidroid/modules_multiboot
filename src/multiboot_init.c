@@ -100,6 +100,10 @@ static void import_kernel_nv(char *name)
     else if (!strcmp(name, "androidboot.hardware")) {
         multiboot_data.hwname = safe_strdup(value);
     }
+
+    else if (!strcmp(name, "androidboot.slot_suffix")) {
+        multiboot_data.slot_suffix = safe_strdup(value);
+    }
 }
 
 static uevent_block_t *get_blockinfo_for_guid(const char *guid)

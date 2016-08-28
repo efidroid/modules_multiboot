@@ -66,8 +66,9 @@ add_executable(init
     lib/android/bionic/mntentex.c
     lib/android/cutils/klog.c
     lib/android/cutils/android_reboot.c
-    lib/android/fs_mgr/fs_mgr.c
     lib/android/fs_mgr/fs_mgr_fstab.c
+    lib/android/fs_mgr/fs_mgr_search.c
+    lib/android/fs_mgr/fs_mgr_slotselect.c
     lib/android/init/cmdline.c
     lib/android/recovery/mounts.c
     lib/lk/cksum/crc32.c

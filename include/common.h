@@ -85,6 +85,7 @@ typedef struct {
     struct fstab *mbfstab;
     list_node_t* blockinfo;
     char* hwname;
+    char* slot_suffix;
     struct fstab *romfstab;
     char* romfstabpath;
 

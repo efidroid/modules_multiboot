@@ -23,6 +23,8 @@
 #define LOG_TAG "fs_mgr"
 #include <lib/log.h>
 
+__BEGIN_DECLS
+
 #define INFO(x...)    LOGI(x)
 #define ERROR(x...)   LOGE(x)
 
@@ -78,14 +80,23 @@
 #define MF_FORCECRYPT   0x400
 #define MF_NOEMULATEDSD 0x800 /* no emulated sdcard daemon, sd card is the only
                                  external storage */
-#define MF_FORMATTABLE  0x1000
-#define MF_ZRAMSTREAMS  0x2000
-#define MF_MULTIBOOT    0x4000
-#define MF_UEFI         0x8000
-#define MF_NVVARS       0x10000
-#define MF_ESP          0x20000
+#define MF_NOTRIM       0x1000
+#define MF_FILEENCRYPTION 0x2000
+#define MF_FORMATTABLE  0x4000
+#define MF_SLOTSELECT   0x8000
+#define MF_FORCEFDEORFBE 0x10000
+#define MF_NOFAIL       0x40000
+#define MF_ZRAMSTREAMS  0x80000
+#define MF_MULTIBOOT    0x100000
+#define MF_UEFI         0x200000
+#define MF_NVVARS       0x400000
+#define MF_ESP          0x800000
 
 #define DM_BUF_SIZE 4096
 
-#endif /* __CORE_FS_MGR_PRIV_H */
+int fs_mgr_set_blk_ro(const char *blockdev);
+int fs_mgr_update_for_slotselect(struct fstab *fstab);
 
+__END_DECLS
+
+#endif /* __CORE_FS_MGR_PRIV_H */

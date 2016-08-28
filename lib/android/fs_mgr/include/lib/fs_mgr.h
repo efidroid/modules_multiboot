@@ -32,6 +32,15 @@
 extern "C" {
 #endif
 
+// Verity modes
+enum verity_mode {
+    VERITY_MODE_EIO = 0,
+    VERITY_MODE_LOGGING = 1,
+    VERITY_MODE_RESTART = 2,
+    VERITY_MODE_LAST = VERITY_MODE_RESTART,
+    VERITY_MODE_DEFAULT = VERITY_MODE_RESTART
+};
+
 /*
  * The entries must be kept in the same order as they were seen in the fstab.
  * Unless explicitly requested, a lookup on mount point should always
@@ -63,13 +72,20 @@ struct fstab_rec {
     char* esp;
 };
 
+// Callback function for verity status
+typedef void (*fs_mgr_verity_state_callback)(struct fstab_rec *fstab,
+        const char *mount_point, int mode, int status);
+
 struct fstab *fs_mgr_read_fstab(const char *fstab_path);
 void fs_mgr_free_fstab(struct fstab *fstab);
 
-#define FS_MGR_MNTALL_DEV_NEEDS_RECOVERY 3
-#define FS_MGR_MNTALL_DEV_NEEDS_ENCRYPTION 2
-#define FS_MGR_MNTALL_DEV_MIGHT_BE_ENCRYPTED 1
-#define FS_MGR_MNTALL_DEV_NOT_ENCRYPTED 0
+#define FS_MGR_MNTALL_DEV_FILE_ENCRYPTED 5
+#define FS_MGR_MNTALL_DEV_NEEDS_RECOVERY 4
+#define FS_MGR_MNTALL_DEV_NEEDS_ENCRYPTION 3
+#define FS_MGR_MNTALL_DEV_MIGHT_BE_ENCRYPTED 2
+#define FS_MGR_MNTALL_DEV_NOT_ENCRYPTED 1
+#define FS_MGR_MNTALL_DEV_NOT_ENCRYPTABLE 0
+#define FS_MGR_MNTALL_FAIL -1
 int fs_mgr_mount_all(struct fstab *fstab);
 
 #define FS_MGR_DOMNT_FAILED -1
@@ -82,28 +98,33 @@ struct fstab_rec* fs_mgr_esp(struct fstab *fstab);
 struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block);
 struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point);
 struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name);
-//int fs_mgr_get_crypt_info(struct fstab *fstab, char *key_loc,
-//                          char *real_blk_device, int size);
+int fs_mgr_get_crypt_info(struct fstab *fstab, char *key_loc,
+                          char *real_blk_device, int size);
+int fs_mgr_load_verity_state(int *mode);
+int fs_mgr_update_verity_state(fs_mgr_verity_state_callback callback);
 int fs_mgr_add_entry(struct fstab *fstab,
                      const char *mount_point, const char *fs_type,
                      const char *blk_device);
 struct fstab_rec *fs_mgr_get_entry_for_mount_point(struct fstab *fstab, const char *path);
 struct fstab_rec *fs_mgr_get_entry_for_mount_point_after(struct fstab_rec *start_rec, struct fstab *fstab, const char *path);
-int fs_mgr_is_voldmanaged(struct fstab_rec *fstab);
-int fs_mgr_is_nonremovable(struct fstab_rec *fstab);
-int fs_mgr_is_verified(struct fstab_rec *fstab);
-int fs_mgr_is_encryptable(struct fstab_rec *fstab);
-int fs_mgr_is_noemulatedsd(struct fstab_rec *fstab);
+int fs_mgr_is_voldmanaged(const struct fstab_rec *fstab);
+int fs_mgr_is_nonremovable(const struct fstab_rec *fstab);
+int fs_mgr_is_verified(const struct fstab_rec *fstab);
+int fs_mgr_is_encryptable(const struct fstab_rec *fstab);
+int fs_mgr_is_file_encrypted(const struct fstab_rec *fstab);
+int fs_mgr_is_convertible_to_fbe(const struct fstab_rec *fstab);
+int fs_mgr_is_noemulatedsd(const struct fstab_rec *fstab);
+int fs_mgr_is_notrim(struct fstab_rec *fstab);
 int fs_mgr_is_formattable(struct fstab_rec *fstab);
-//int fs_mgr_swapon_all(struct fstab *fstab);
-int fs_mgr_is_multiboot(struct fstab_rec *fstab);
-int fs_mgr_is_uefi(struct fstab_rec *fstab);
+int fs_mgr_is_nofail(struct fstab_rec *fstab);
+int fs_mgr_swapon_all(struct fstab *fstab);
+int fs_mgr_is_multiboot(const struct fstab_rec *fstab);
+int fs_mgr_is_uefi(const struct fstab_rec *fstab);
 
-//int fs_mgr_do_format(struct fstab_rec *fstab);
+int fs_mgr_do_format(struct fstab_rec *fstab);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* __CORE_FS_MGR_H */
-
