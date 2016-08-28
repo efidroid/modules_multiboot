@@ -257,15 +257,20 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
     return NULL;
 }
 
-char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path)
+char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char* prefix)
 {
     uevent_block_t *bi = get_blockinfo_for_path(info, path);
     if (!bi)
         return NULL;
 
-    SAFE_SNPRINTF_RET(LOGE, NULL, resolved_path, PATH_MAX, "/dev/block/%s", bi->devname);
+    SAFE_SNPRINTF_RET(LOGE, NULL, resolved_path, PATH_MAX, "%s/dev/block/%s", prefix, bi->devname);
 
     return resolved_path;
+}
+
+char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path)
+{
+    return uevent_realpath_prefix(info, path, resolved_path, "");
 }
 
 int uevent_create_nodes(list_node_t *info, const char *path)
