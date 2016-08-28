@@ -42,6 +42,22 @@ struct fstab_rec* fs_mgr_esp(struct fstab *fstab)
     return NULL;
 }
 
+struct fstab_rec* fs_mgr_nvvars(struct fstab *fstab)
+{
+    int i = 0;
+
+    if (!fstab) {
+        return NULL;
+    }
+
+    for (i = 0; i < fstab->num_entries; i++) {
+        if(fs_mgr_is_nvvars(&fstab->recs[i]))
+            return &fstab->recs[i];
+    }
+
+    return NULL;
+}
+
 struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block)
 {
     int i = 0;

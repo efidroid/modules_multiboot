@@ -95,6 +95,7 @@ int fs_mgr_do_mount(struct fstab *fstab, char *n_name, char *n_blk_device,
 int fs_mgr_do_tmpfs_mount(char *n_name);
 int fs_mgr_unmount_all(struct fstab *fstab);
 struct fstab_rec* fs_mgr_esp(struct fstab *fstab);
+struct fstab_rec* fs_mgr_nvvars(struct fstab *fstab);
 struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block);
 struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point);
 struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name);
@@ -120,6 +121,7 @@ int fs_mgr_is_nofail(struct fstab_rec *fstab);
 int fs_mgr_swapon_all(struct fstab *fstab);
 int fs_mgr_is_multiboot(const struct fstab_rec *fstab);
 int fs_mgr_is_uefi(const struct fstab_rec *fstab);
+int fs_mgr_is_nvvars(const struct fstab_rec *fstab);
 
 int fs_mgr_do_format(struct fstab_rec *fstab);
 

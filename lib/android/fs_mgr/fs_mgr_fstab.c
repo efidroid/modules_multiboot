@@ -536,3 +536,8 @@ int fs_mgr_is_uefi(const struct fstab_rec *fstab)
 {
     return fstab->fs_mgr_flags & (MF_UEFI);
 }
+
+int fs_mgr_is_nvvars(const struct fstab_rec *fstab)
+{
+    return fstab->fs_mgr_flags & (MF_NVVARS);
+}
