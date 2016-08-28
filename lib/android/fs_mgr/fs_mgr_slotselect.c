@@ -26,11 +26,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 //#include <cutils/properties.h>
 
 #include <lib/fs_mgr.h>
 #include "fs_mgr_priv.h"
+#include <common.h>
 
 #include <lib/bootloader.h>
 
@@ -61,11 +63,19 @@ static int get_active_slot_suffix_from_misc(struct fstab *fstab,
     int misc_fd;
     ssize_t num_read;
     struct bootloader_message msg;
+    char buf[PATH_MAX];
 
     misc_fd = -1;
     for (n = 0; n < fstab->num_entries; n++) {
         if (strcmp(fstab->recs[n].mount_point, "/misc") == 0) {
-            misc_fd = open(fstab->recs[n].blk_device, O_RDONLY);
+            char* miscpath = uevent_realpath_prefix(multiboot_get_data()->blockinfo, fstab->recs[n].blk_device, buf, MBPATH_ROOT);
+            if (!miscpath) {
+                ERROR("Error resolving misc partition path \"%s\"\n",
+                      fstab->recs[n].blk_device);
+                return -1;
+            }
+
+            misc_fd = open(miscpath, O_RDONLY);
             if (misc_fd == -1) {
                 ERROR("Error opening misc partition \"%s\" (%s)\n",
                       fstab->recs[n].blk_device,
