@@ -227,3 +227,23 @@ continue_syscall:
 
     return ret;
 }
+
+SYSCALL_DEFINE3(execve, const char __user *, name,
+        const char __user *const __user *, argv,
+        const char __user *const __user *, envp)
+{
+    char kname[PATH_MAX];
+
+    kname[0] = 0;
+    if(name) {
+        syshook_strncpy_user(process, kname, name, sizeof(kname));
+        LOGV("%s(%s, %p, %p)\n", __func__, kname, argv, envp);
+
+        // don't trace ueventd to speed up the boot process
+        if(!strcmp(kname, "/sbin/ueventd")) {
+            syshook_stop_tracing(process);
+        }
+    }
+
+    return syshook_invoke_hookee(process);
+}

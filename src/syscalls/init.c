@@ -125,6 +125,7 @@ int multiboot_exec_tracee(char **par)
     register_syscall(mount);
     register_syscall(fcntl);
     register_syscall(fcntl64);
+    register_syscall(execve);
 
     syshook_context_t *context = syshook_create_context(sys_call_table);
     context->create_process = multiboot_trace_create_process;
