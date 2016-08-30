@@ -221,6 +221,14 @@ static int selinux_fixup(void)
 
     // we ignore errors on purpose here because selinux might not be needed or supported by the system
 
+    // this makes sure /dev got published before starting any services
+    util_append_string_to_file("/init.rc", "\n\n"
+                               "on early-init\n"
+                               // wait for coldboot
+                               // together with init's wait we're waiting 10s for this file
+                               "    wait /dev/.coldboot_done\n"
+                               "\n");
+
     // recovery
     if (multiboot_data.is_recovery) {
         return 0;
