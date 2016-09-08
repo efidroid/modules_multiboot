@@ -69,7 +69,7 @@ struct fstab_rec {
     int swap_prio;
     unsigned int zram_size;
     unsigned int zram_streams;
-    char* esp;
+    char *esp;
 };
 
 // Callback function for verity status
@@ -94,11 +94,11 @@ int fs_mgr_do_mount(struct fstab *fstab, char *n_name, char *n_blk_device,
                     char *tmp_mount_point);
 int fs_mgr_do_tmpfs_mount(char *n_name);
 int fs_mgr_unmount_all(struct fstab *fstab);
-struct fstab_rec* fs_mgr_esp(struct fstab *fstab);
-struct fstab_rec* fs_mgr_nvvars(struct fstab *fstab);
-struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block);
-struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point);
-struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name);
+struct fstab_rec *fs_mgr_esp(struct fstab *fstab);
+struct fstab_rec *fs_mgr_nvvars(struct fstab *fstab);
+struct fstab_rec *fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t *block);
+struct fstab_rec *fs_mgr_get_by_mountpoint(struct fstab *fstab, const char *mount_point);
+struct fstab_rec *fs_mgr_get_by_name(struct fstab *fstab, const char *name);
 int fs_mgr_get_crypt_info(struct fstab *fstab, char *key_loc,
                           char *real_blk_device, int size);
 int fs_mgr_load_verity_state(int *mode);

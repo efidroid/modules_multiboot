@@ -44,16 +44,16 @@ typedef struct {
 } efi_guid_t;
 
 int efivar_dump(void);
-int efivar_get(const char* name, efi_guid_t* guid,
-               uint32_t* attributes, uint32_t* datasize, void* data);
-int efivar_set(const char* name, efi_guid_t* guid,
-               uint32_t attributes, uint32_t datasize, const void* data);
+int efivar_get(const char *name, efi_guid_t *guid,
+               uint32_t *attributes, uint32_t *datasize, void *data);
+int efivar_set(const char *name, efi_guid_t *guid,
+               uint32_t attributes, uint32_t datasize, const void *data);
 
-int efivar_get_global(const char* name, uint32_t* datasize, void* data);
-int efivar_set_global(const char* name, uint32_t datasize, const void* data);
+int efivar_get_global(const char *name, uint32_t *datasize, void *data);
+int efivar_set_global(const char *name, uint32_t datasize, const void *data);
 
-int efivar_get_efidroid(const char* name, uint32_t* datasize, void* data);
-int efivar_set_efidroid(const char* name, uint32_t datasize, const void* data);
+int efivar_get_efidroid(const char *name, uint32_t *datasize, void *data);
+int efivar_set_efidroid(const char *name, uint32_t datasize, const void *data);
 
 int efivars_set_error(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
 #endif

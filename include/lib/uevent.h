@@ -27,7 +27,7 @@ typedef enum {
 
 typedef struct {
     list_node_t node;
-    char* filename;
+    char *filename;
 
     unsigned major;
     unsigned minor;
@@ -38,13 +38,13 @@ typedef struct {
 } uevent_block_t;
 
 list_node_t *get_block_devices(void);
-void add_new_block_devices(list_node_t* info);
+void add_new_block_devices(list_node_t *info);
 void free_block_devices(list_node_t *info);
 uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path);
 uevent_block_t *get_blockinfo_for_partname(list_node_t *info, const char *partname);
 uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname);
 char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path);
-char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char* prefix);
+char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char *prefix);
 int uevent_create_nodes(list_node_t *info, const char *path);
 int uevent_mount(uevent_block_t *bi, const char *target,
                  const char *filesystemtype, unsigned long mountflags,

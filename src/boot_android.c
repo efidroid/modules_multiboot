@@ -184,8 +184,9 @@ finish:
         MBABORT("post-fs-data init failed: rc=%d errno=%d\n", rc, errno);
 }
 
-static void add_remount_entry(struct fstab_rec *rec, part_replacement_t *replacement) {
-    remount_entry_t* entry = safe_malloc(sizeof(remount_entry_t));
+static void add_remount_entry(struct fstab_rec *rec, part_replacement_t *replacement)
+{
+    remount_entry_t *entry = safe_malloc(sizeof(remount_entry_t));
     entry->rec = rec;
     entry->replacement = replacement;
     list_add_tail(&remount_entries, &entry->node);
@@ -363,7 +364,7 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
 write_unmodified:
         fputs(line, fp_out);
 
-        if(pcmd && strstr(pcmd, "mount_all")==pcmd && isspace(pcmd[9])) {
+        if (pcmd && strstr(pcmd, "mount_all")==pcmd && isspace(pcmd[9])) {
             fputs("\n"
                   // start mbtrigger
                   "    write "MBPATH_TRIGGER_CMD" post-fstab\n"
@@ -372,7 +373,7 @@ write_unmodified:
 
                   // mbtrigger cleanup
                   "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
-            , fp_out);
+                  , fp_out);
         }
     }
 

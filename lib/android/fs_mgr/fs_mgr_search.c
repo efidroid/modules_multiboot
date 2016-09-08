@@ -26,7 +26,7 @@
 
 #include "fs_mgr_priv.h"
 
-struct fstab_rec* fs_mgr_esp(struct fstab *fstab)
+struct fstab_rec *fs_mgr_esp(struct fstab *fstab)
 {
     int i = 0;
 
@@ -35,14 +35,14 @@ struct fstab_rec* fs_mgr_esp(struct fstab *fstab)
     }
 
     for (i = 0; i < fstab->num_entries; i++) {
-        if(fstab->recs[i].esp)
+        if (fstab->recs[i].esp)
             return &fstab->recs[i];
     }
 
     return NULL;
 }
 
-struct fstab_rec* fs_mgr_nvvars(struct fstab *fstab)
+struct fstab_rec *fs_mgr_nvvars(struct fstab *fstab)
 {
     int i = 0;
 
@@ -51,19 +51,19 @@ struct fstab_rec* fs_mgr_nvvars(struct fstab *fstab)
     }
 
     for (i = 0; i < fstab->num_entries; i++) {
-        if(fs_mgr_is_nvvars(&fstab->recs[i]))
+        if (fs_mgr_is_nvvars(&fstab->recs[i]))
             return &fstab->recs[i];
     }
 
     return NULL;
 }
 
-struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t* block)
+struct fstab_rec *fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t *block)
 {
     int i = 0;
     char buf[PATH_MAX];
-    char* fstype = NULL;
-    struct fstab_rec* ret = NULL;
+    char *fstype = NULL;
+    struct fstab_rec *ret = NULL;
     int rc;
 
     if (!fstab) {
@@ -72,7 +72,7 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
 
     // build dev name
     rc = snprintf(buf, sizeof(buf), MBPATH_DEV"/block/%s", block->devname);
-    if(rc<0 || (size_t)rc>=sizeof(buf)) {
+    if (rc<0 || (size_t)rc>=sizeof(buf)) {
         return NULL;
     }
 
@@ -81,11 +81,11 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
 
     for (i = 0; i < fstab->num_entries; i++) {
         uevent_block_t *fstab_block = get_blockinfo_for_path(multiboot_get_data()->blockinfo, fstab->recs[i].blk_device);
-        if(!fstab_block)
+        if (!fstab_block)
             continue;
 
         // assume that we only have one global blockinfo list
-        if(fstab_block==block) {
+        if (fstab_block==block) {
             ret = &fstab->recs[i];
             break;
         }
@@ -95,7 +95,8 @@ struct fstab_rec* fs_mgr_get_by_ueventblock(struct fstab *fstab, uevent_block_t*
     return ret;
 }
 
-struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* mount_point) {
+struct fstab_rec *fs_mgr_get_by_mountpoint(struct fstab *fstab, const char *mount_point)
+{
     int i = 0;
 
     if (!fstab) {
@@ -103,14 +104,15 @@ struct fstab_rec* fs_mgr_get_by_mountpoint(struct fstab *fstab, const char* moun
     }
 
     for (i = 0; i < fstab->num_entries; i++) {
-        if(!strcmp(fstab->recs[i].mount_point, mount_point))
+        if (!strcmp(fstab->recs[i].mount_point, mount_point))
             return &fstab->recs[i];
     }
 
     return NULL;
 }
 
-struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name) {
+struct fstab_rec *fs_mgr_get_by_name(struct fstab *fstab, const char *name)
+{
     int i = 0;
 
     if (!fstab) {
@@ -118,7 +120,7 @@ struct fstab_rec* fs_mgr_get_by_name(struct fstab *fstab, const char* name) {
     }
 
     for (i = 0; i < fstab->num_entries; i++) {
-        if(!strcmp(fstab->recs[i].mount_point+1, name))
+        if (!strcmp(fstab->recs[i].mount_point+1, name))
             return &fstab->recs[i];
     }
 

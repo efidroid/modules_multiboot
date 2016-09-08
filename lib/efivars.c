@@ -103,7 +103,7 @@ static char *efivar_getdev(void)
     if (!mbdata || !mbdata->blockinfo) goto err;
 
     // get fstab rec for nvvars partition
-    struct fstab_rec* rec = fs_mgr_nvvars(mbdata->mbfstab);
+    struct fstab_rec *rec = fs_mgr_nvvars(mbdata->mbfstab);
     if (!rec) goto err;
 
     // get block of our partition

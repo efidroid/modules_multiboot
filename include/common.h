@@ -57,8 +57,8 @@
 
 #define UNUSED __attribute__((unused))
 
-extern size_t strlcat(char* __restrict, const char* __restrict, size_t);
-extern size_t strlcpy(char* __restrict, const char* __restrict, size_t);
+extern size_t strlcat(char *__restrict, const char *__restrict, size_t);
+extern size_t strlcpy(char *__restrict, const char *__restrict, size_t);
 
 typedef enum {
     MBPART_TYPE_LOOP = 0,
@@ -66,11 +66,11 @@ typedef enum {
 } multiboot_partition_type_t;
 
 typedef struct {
-    char* name;
-    char* path;
+    char *name;
+    char *path;
 
     multiboot_partition_type_t type;
-    uevent_block_t* uevent_block;
+    uevent_block_t *uevent_block;
 } multiboot_partition_t;
 
 typedef struct {
@@ -78,16 +78,16 @@ typedef struct {
     int is_recovery;
 
     // ESP
-    struct fstab_rec* esp;
-    uevent_block_t* espdev;
+    struct fstab_rec *esp;
+    uevent_block_t *espdev;
 
     // device info
     struct fstab *mbfstab;
-    list_node_t* blockinfo;
-    char* hwname;
-    char* slot_suffix;
+    list_node_t *blockinfo;
+    char *hwname;
+    char *slot_suffix;
     struct fstab *romfstab;
-    char* romfstabpath;
+    char *romfstabpath;
 
     // partition replacement list
     list_node_t replacements;
@@ -95,47 +95,47 @@ typedef struct {
     // only available during multiboot
 
     // boot device
-    char* guid;
-    char* path;
-    uevent_block_t* bootdev;
+    char *guid;
+    char *path;
+    uevent_block_t *bootdev;
     int bootdev_supports_bindmount;
 
     // multiboot.ini data
-    multiboot_partition_t* mbparts;
+    multiboot_partition_t *mbparts;
     uint32_t num_mbparts;
 
     // datamedia
     uint32_t native_data_layout_version;
-    const char* datamedia_source;
-    const char* datamedia_target;
+    const char *datamedia_source;
+    const char *datamedia_target;
 } multiboot_data_t;
 
 typedef struct {
     list_node_t node;
     pthread_mutex_t lock;
 
-    uevent_block_t* uevent_block;
+    uevent_block_t *uevent_block;
 
     // raw part for loop, stub part for bind
-    char* loopdevice;
-    char* loopfile;
+    char *loopdevice;
+    char *loopfile;
     int losetup_done;
     // optional, file to sync changes to
-    char* loop_sync_target;
+    char *loop_sync_target;
 
     struct {
-        multiboot_partition_t* part;
+        multiboot_partition_t *part;
 
         // bind
-        char* partpath;
+        char *partpath;
     } multiboot;
 } part_replacement_t;
 
 
 int run_init(int trace);
-int multiboot_main(int argc, char** argv);
-int multiboot_exec_tracee(char** par);
-multiboot_data_t* multiboot_get_data(void);
+int multiboot_main(int argc, char **argv);
+int multiboot_exec_tracee(char **par);
+multiboot_data_t *multiboot_get_data(void);
 int boot_recovery(void);
 int boot_android(void);
 

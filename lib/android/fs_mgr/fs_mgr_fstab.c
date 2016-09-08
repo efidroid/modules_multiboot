@@ -33,7 +33,7 @@ struct fs_mgr_flag_values {
     int swap_prio;
     unsigned int zram_size;
     unsigned int zram_streams;
-    char* esp;
+    char *esp;
 };
 
 struct flag_list {

@@ -195,7 +195,7 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
 
         // remount to apply requested mount-flags
-        if(ret==0) {
+        if (ret==0) {
             ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND|MS_REMOUNT|flags, data);
             LOGV("%s: bind re-mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
         }
@@ -229,18 +229,18 @@ continue_syscall:
 }
 
 SYSCALL_DEFINE3(execve, const char __user *, name,
-        const char __user *const __user *, argv,
-        const char __user *const __user *, envp)
+                const char __user *const __user *, argv,
+                const char __user *const __user *, envp)
 {
     char kname[PATH_MAX];
 
     kname[0] = 0;
-    if(name) {
+    if (name) {
         syshook_strncpy_user(process, kname, name, sizeof(kname));
         LOGV("%s(%s, %p, %p)\n", __func__, kname, argv, envp);
 
         // don't trace ueventd to speed up the boot process
-        if(!strcmp(kname, "/sbin/ueventd")) {
+        if (!strcmp(kname, "/sbin/ueventd")) {
             syshook_stop_tracing(process);
         }
     }

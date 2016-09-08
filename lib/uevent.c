@@ -257,7 +257,7 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
     return NULL;
 }
 
-char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char* prefix)
+char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char *prefix)
 {
     uevent_block_t *bi = get_blockinfo_for_path(info, path);
     if (!bi)

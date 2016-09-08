@@ -38,14 +38,14 @@
 int busybox_main(int argc, char *argv[]);
 int mke2fs_main(int argc, char *argv[]);
 
-char* util_basename(const char* path);
-char* util_dirname(const char* path);
-int util_buf2file(const void* buf, const char* filename, size_t size);
+char *util_basename(const char *path);
+char *util_dirname(const char *path);
+int util_buf2file(const void *buf, const char *filename, size_t size);
 int util_exists(const char *filename, bool follow);
 uint64_t util_filesize(const char *filename, bool follow);
 int util_mkdir(const char *dir);
-int util_sepolicy_inject(const char* source, const char* target, const char* clazz, const char* perm);
-int util_append_string_to_file(const char* filename, const char* str);
+int util_sepolicy_inject(const char *source, const char *target, const char *clazz, const char *perm);
+int util_append_string_to_file(const char *filename, const char *str);
 int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *));
 int util_mount(const char *source, const char *target,
                const char *filesystemtype, unsigned long mountflags,
@@ -53,27 +53,27 @@ int util_mount(const char *source, const char *target,
 int util_make_loop(const char *path);
 int util_losetup(const char *device, const char *file, bool ro);
 int util_losetup_free(const char *_device);
-int util_mkfs(const char *device, const char* fstype);
-int util_block_num(const char *path, unsigned long* numblocks);
+int util_mkfs(const char *device, const char *fstype);
+int util_block_num(const char *path, unsigned long *numblocks);
 int util_dd(const char *source, const char *target, unsigned long blocks);
 int util_cp(const char *source, const char *target);
 int util_shell(const char *cmd);
 char *util_get_fstype(const char *filename);
-char* util_get_espdir(const char* mountpoint);
-int util_create_partition_backup_ex(const char* device, const char* file, unsigned long num_blocks, bool force);
-int util_create_partition_backup(const char* device, const char* file);
-char* util_getmbpath_from_device(const char* device);
-int util_fs_supports_multiboot_bind(const char* type);
+char *util_get_espdir(const char *mountpoint);
+int util_create_partition_backup_ex(const char *device, const char *file, unsigned long num_blocks, bool force);
+int util_create_partition_backup(const char *device, const char *file);
+char *util_getmbpath_from_device(const char *device);
+int util_fs_supports_multiboot_bind(const char *type);
 int util_mount_esp(int abort_on_error);
 int util_dynfilefs(const char *_source, const char *_target, uint64_t size);
-int util_mount_mbinipart(const char* name, const char* mountpoint);
-char* util_get_property(const char* filename, const char* propertyname);
-int util_read_int(const char* filename, uint32_t* pvalue);
-int util_write_int(char const* path, int value);
-part_replacement_t* util_get_replacement_by_name(const char* name);
+int util_mount_mbinipart(const char *name, const char *mountpoint);
+char *util_get_property(const char *filename, const char *propertyname);
+int util_read_int(const char *filename, uint32_t *pvalue);
+int util_write_int(char const *path, int value);
+part_replacement_t *util_get_replacement_by_name(const char *name);
 const char *util_get_file_extension(const char *filename);
-char* util_get_file_contents(const char* filename);
-char* util_get_esp_path_for_partition(const char* mountpoint, const char* name);
-part_replacement_t* util_get_replacement(unsigned int major, unsigned int minor);
+char *util_get_file_contents(const char *filename);
+char *util_get_esp_path_for_partition(const char *mountpoint, const char *name);
+part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor);
 
 #endif
