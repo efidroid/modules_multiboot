@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <libgen.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -852,4 +853,22 @@ part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor)
         }
     }
     return NULL;
+}
+
+uint64_t util_gettime_ns() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)(now.tv_sec) * UINT64_C(1000000000) + now.tv_nsec;
+}
+
+int util_wait_for_file(const char *filename, int timeout)
+{
+    struct stat info;
+    uint64_t timeout_time_ns = util_gettime_ns() + timeout * UINT64_C(1000000000);
+    int ret = -1;
+
+    while (util_gettime_ns() < timeout_time_ns && ((ret = stat(filename, &info)) < 0))
+        usleep(10000);
+
+    return ret;
 }

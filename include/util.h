@@ -75,5 +75,6 @@ const char *util_get_file_extension(const char *filename);
 char *util_get_file_contents(const char *filename);
 char *util_get_esp_path_for_partition(const char *mountpoint, const char *name);
 part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor);
+int util_wait_for_file(const char *filename, int timeout);
 
 #endif

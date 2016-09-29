@@ -129,6 +129,9 @@ static int get_block_devices_internal(list_node_t *info, int rescan)
     const char *path = UEVENT_PATH_BLOCK_DEVICES;
     char buf[PATH_MAX];
 
+    // for for the mmc device to go online
+    util_wait_for_file(UEVENT_PATH_BLOCK_DEVICES "/mmcblk0", 5);
+
     DIR *d = opendir(path);
     if (!d) {
         LOGE("Can't open %s: %s\n", path, strerror(errno));
