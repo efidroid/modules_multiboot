@@ -32,7 +32,6 @@
 #include <lib/fs_mgr.h>
 #include <lib/dynfilefs.h>
 #include <blkid/blkid.h>
-#include <sepolicy_inject.h>
 #include <ini.h>
 
 #include <common.h>
@@ -194,11 +193,6 @@ int util_exec_main(int argc, char **argv, int (*mainfn)(int, char **))
     }
 
     return status;
-}
-
-int util_sepolicy_inject(const char *source, const char *target, const char *clazz, const char *perm)
-{
-    return sepolicy_inject_rule(source, target, clazz, perm, "/sepolicy", NULL);
 }
 
 int util_append_string_to_file(const char *filename, const char *str)

@@ -44,7 +44,6 @@ int util_buf2file(const void *buf, const char *filename, size_t size);
 int util_exists(const char *filename, bool follow);
 uint64_t util_filesize(const char *filename, bool follow);
 int util_mkdir(const char *dir);
-int util_sepolicy_inject(const char *source, const char *target, const char *clazz, const char *perm);
 int util_append_string_to_file(const char *filename, const char *str);
 int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *));
 int util_mount(const char *source, const char *target,

@@ -35,6 +35,7 @@
 #include <lib/fs_mgr.h>
 #include <blkid/blkid.h>
 #include <ini.h>
+#include <sepolicy_inject.h>
 
 #include <util.h>
 #include <common.h>
@@ -234,56 +235,65 @@ static int selinux_fixup(void)
         return 0;
     }
 
-    util_sepolicy_inject("init_multiboot", "rootfs", "filesystem", "associate");
-    util_sepolicy_inject("init", "init_multiboot", "file", "relabelto,getattr,execute,read,execute_no_trans,open");
-    util_sepolicy_inject("kernel", "rootfs", "file", "execute,unlink");
-    util_sepolicy_inject("rootfs", "tmpfs", "filesystem", "associate");
+    void *handle = sepolicy_inject_open("/sepolicy");
+    if (handle) {
+        sepolicy_inject_add_rule(handle, "init_multiboot", "rootfs", "filesystem", "associate");
+        sepolicy_inject_add_rule(handle, "init", "init_multiboot", "file", "relabelto,getattr,execute,read,execute_no_trans,open");
+        sepolicy_inject_add_rule(handle, "kernel", "rootfs", "file", "execute,unlink");
+        sepolicy_inject_add_rule(handle, "rootfs", "tmpfs", "filesystem", "associate");
 
-    // let init run postfs trigger
-    util_sepolicy_inject("init", "init", "process", "execmem");
-    util_sepolicy_inject("init", "kernel", "process", "signal");
-    util_sepolicy_inject("init", "rootfs", "file", "create,write,unlink");
+        // let init run postfs trigger
+        sepolicy_inject_add_rule(handle, "init", "init", "process", "execmem");
+        sepolicy_inject_add_rule(handle, "init", "kernel", "process", "signal");
+        sepolicy_inject_add_rule(handle, "init", "rootfs", "file", "create,write,unlink");
 
-    // let init.multiboot do it's postfs work
-    util_sepolicy_inject("kernel", "rootfs", "dir", "read,write,add_name,create,remove_name");
-    util_sepolicy_inject("kernel", "tmpfs", "dir", "mounton");
-    util_sepolicy_inject("kernel", "kernel", "capability", "mknod,sys_admin");
-    util_sepolicy_inject("kernel", "init", "dir", "search");
-    util_sepolicy_inject("kernel", "init", "file", "read,open,getattr");
-    util_sepolicy_inject("kernel", "init", "process", "signal");
-    util_sepolicy_inject("kernel", "block_device", "dir", "write,remove_name,add_name");
-    util_sepolicy_inject("kernel", "block_device", "blk_file", "create,unlink,getattr,write");
-    util_sepolicy_inject("kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
-    util_sepolicy_inject("kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
-    util_sepolicy_inject("kernel", "cache_block_device", "blk_file", "unlink");
-    util_sepolicy_inject("kernel", "userdata_block_device", "blk_file", "unlink");
-    util_sepolicy_inject("kernel", "device", "dir", "write,add_name");
-    util_sepolicy_inject("kernel", "device", "blk_file", "create,read,write");
-    util_sepolicy_inject("kernel", "media_rw_data_file", "dir", "getattr,search");
-    util_sepolicy_inject("kernel", "media_rw_data_file", "file", "getattr,read,write,open");
+        // let init.multiboot do it's postfs work
+        sepolicy_inject_add_rule(handle, "kernel", "rootfs", "dir", "read,write,add_name,create,remove_name");
+        sepolicy_inject_add_rule(handle, "kernel", "tmpfs", "dir", "mounton");
+        sepolicy_inject_add_rule(handle, "kernel", "kernel", "capability", "mknod,sys_admin");
+        sepolicy_inject_add_rule(handle, "kernel", "init", "dir", "search");
+        sepolicy_inject_add_rule(handle, "kernel", "init", "file", "read,open,getattr");
+        sepolicy_inject_add_rule(handle, "kernel", "init", "process", "signal");
+        sepolicy_inject_add_rule(handle, "kernel", "block_device", "dir", "write,remove_name,add_name");
+        sepolicy_inject_add_rule(handle, "kernel", "block_device", "blk_file", "create,unlink,getattr,write");
+        sepolicy_inject_add_rule(handle, "kernel", "boot_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+        sepolicy_inject_add_rule(handle, "kernel", "recovery_block_device", "blk_file", "getattr,read,open,ioctl,unlink");
+        sepolicy_inject_add_rule(handle, "kernel", "cache_block_device", "blk_file", "unlink");
+        sepolicy_inject_add_rule(handle, "kernel", "userdata_block_device", "blk_file", "unlink");
+        sepolicy_inject_add_rule(handle, "kernel", "device", "dir", "write,add_name");
+        sepolicy_inject_add_rule(handle, "kernel", "device", "blk_file", "create,read,write");
+        sepolicy_inject_add_rule(handle, "kernel", "media_rw_data_file", "dir", "getattr,search");
+        sepolicy_inject_add_rule(handle, "kernel", "media_rw_data_file", "file", "getattr,read,write,open");
 
-    // for access to /dev/fuse
-    util_sepolicy_inject("kernel", "rootfs", "chr_file", "read,write");
+        // for access to /dev/fuse
+        sepolicy_inject_add_rule(handle, "kernel", "rootfs", "chr_file", "read,write");
 
-    // for our restorecon injections
-    util_sepolicy_inject("init", "rootfs", "dir", "relabelto");
-    util_sepolicy_inject("init", "tmpfs", "chr_file", "relabelfrom");
-    util_sepolicy_inject("init", "null_device", "chr_file", "relabelto");
-    util_sepolicy_inject("init", "zero_device", "chr_file", "relabelto");
-    util_sepolicy_inject("init", "block_device", "blk_file", "relabelto");
-    util_sepolicy_inject("init", "block_device", "dir", "relabelto");
-    util_sepolicy_inject("init", "tmpfs", "blk_file", "getattr");
-    util_sepolicy_inject("init", "tmpfs", "blk_file", "relabelfrom");
-    util_sepolicy_inject("init", "device", "dir", "relabelto");
+        // for our restorecon injections
+        sepolicy_inject_add_rule(handle, "init", "rootfs", "dir", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "tmpfs", "chr_file", "relabelfrom");
+        sepolicy_inject_add_rule(handle, "init", "null_device", "chr_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "zero_device", "chr_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "block_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "block_device", "dir", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "tmpfs", "blk_file", "getattr");
+        sepolicy_inject_add_rule(handle, "init", "tmpfs", "blk_file", "relabelfrom");
+        sepolicy_inject_add_rule(handle, "init", "device", "dir", "relabelto");
+
+        if (multiboot_data.is_multiboot) {
+            // the loop images are not labeled
+            sepolicy_inject_add_rule(handle, "kernel", "unlabeled", "file", "read");
+
+            // this is for the datamedia bind-mount
+            sepolicy_inject_add_rule(handle, "init", "media_rw_data_file", "dir", "mounton");
+            sepolicy_inject_add_rule(handle, "init", "block_device", "lnk_file", "setattr");
+        }
+
+        // write new policy
+        sepolicy_inject_write(handle, "/sepolicy");
+        sepolicy_inject_close(handle);
+    }
 
     if (multiboot_data.is_multiboot) {
-        // the loop images are not labeled
-        util_sepolicy_inject("kernel", "unlabeled", "file", "read");
-
-        // this is for the datamedia bind-mount
-        util_sepolicy_inject("init", "media_rw_data_file", "dir", "mounton");
-        util_sepolicy_inject("init", "block_device", "lnk_file", "setattr");
-
         // just in case we changed/created it
         util_append_string_to_file("/init.rc", "\n\n"
                                    "on post-fs-data\n"
@@ -316,6 +326,9 @@ static int selinux_fixup(void)
                                "    restorecon_recursive /multiboot/dev\n"
                                "\n"
                               );
+
+    fflush(stderr);
+    fflush(stdout);
 
     return rc;
 }
