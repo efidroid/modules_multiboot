@@ -1166,6 +1166,9 @@ int multiboot_main(UNUSED int argc, char **argv)
         if (rc) {
             MBABORT("Can't parse '%s': %s\n", buf, strerror(errno));
         }
+        if (index != multiboot_data.num_mbparts) {
+            MBABORT("retrieved wrong number of partitions %u/%u\n", index, multiboot_data.num_mbparts);
+        }
 
         // verify that every multiboot partition in mbfstab got replaced
         for (i=0; i<multiboot_data.mbfstab->num_entries; i++) {
