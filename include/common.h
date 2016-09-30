@@ -54,6 +54,7 @@
 #define MBPATH_TRIGGER_BIN "/trigger"
 #define MBPATH_TRIGGER_CMD "/multiboot/.trigger_cmd"
 #define MBPATH_TRIGGER_WAIT_FILE "/multiboot/.trigger_wait"
+#define MBPATH_STATEFILE MBPATH_ROOT "/mbstate"
 
 #define UNUSED __attribute__((unused))
 
@@ -138,5 +139,9 @@ int multiboot_exec_tracee(char **par);
 multiboot_data_t *multiboot_get_data(void);
 int boot_recovery(void);
 int boot_android(void);
+
+int handle_trigger(char *cmd);
+int state_save(void);
+int state_restore(void);
 
 #endif

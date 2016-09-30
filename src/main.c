@@ -29,36 +29,41 @@
 
 #include <lib/dynfilefs.h>
 
-static volatile sig_atomic_t usr_interrupt = 0;
-static void synch_signal(UNUSED int sig, UNUSED siginfo_t *info, UNUSED void *vp)
+static int trigger_main(void)
 {
-    // stop waiting for signals
-    usr_interrupt = 1;
-}
+    int rc;
+    int fd;
 
-static int trigger_main(int argc, char **argv)
-{
-    if (argc!=2)
-        return -EINVAL;
+    // init logging
+    log_init();
 
-    int mbinit_pid = atoi(argv[1]);
-    if (mbinit_pid<=0)
-        return -EINVAL;
+    // restore state
+    rc = state_restore();
+    if (rc) {
+        LOGE("can't restore state\n");
+        goto done;
+    }
 
-    // setup signal handler for the mbinit callback
-    util_setsighandler(SIGUSR1, synch_signal);
+    // get command
+    char *cmd = util_get_file_contents(MBPATH_TRIGGER_CMD);
+    unlink(MBPATH_TRIGGER_CMD);
+    if (!cmd) {
+        LOGE("can't read trigger command\n");
+        goto done;
+    }
 
-    // signal mbinit
-    kill(mbinit_pid, SIGUSR1);
+    // run trigger handler
+    rc = handle_trigger(cmd);
 
-    // wait for mbinit to tell us it's finished
-    WAIT_FOR_SIGNAL(SIGUSR1, !usr_interrupt);
+    // cleanup
+    free(cmd);
 
+done:
     // tell init to continue (it waits for this file)
-    int fd = open(MBPATH_TRIGGER_WAIT_FILE, O_RDWR|O_CREAT);
+    fd = open(MBPATH_TRIGGER_WAIT_FILE, O_RDWR|O_CREAT);
     if (fd) close(fd);
 
-    return 0;
+    return rc;
 }
 
 int main(int argc, char **argv)
@@ -73,7 +78,7 @@ int main(int argc, char **argv)
     if (!strcmp(progname, "init.multiboot")) {
         if (argc>=2) {
             if (!strcmp(argv[1], "trigger")) {
-                return trigger_main(argc-1, argv+1);
+                return trigger_main();
             } else if (!strcmp(argv[1], "mke2fs")) {
                 return mke2fs_main(argc-1, argv+1);
             } else if (!strcmp(argv[1], "busybox")) {
@@ -87,7 +92,7 @@ int main(int argc, char **argv)
             MBABORT("multiboot_main returned\n");
         }
     } else if (!strcmp(progname, "trigger")) {
-        return trigger_main(argc, argv);
+        return trigger_main();
     } else if (!strcmp(progname, "mke2fs")) {
         return mke2fs_main(argc, argv);
     } else if (!strcmp(progname, "busybox")) {

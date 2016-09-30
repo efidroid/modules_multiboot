@@ -200,17 +200,9 @@ static void handle_on_post_fstab(void)
     }
 }
 
-static volatile sig_atomic_t mbinit_usr_interrupt = 0;
-static void mbinit_usr_handler(UNUSED int sig, siginfo_t *info, UNUSED void *vp)
+int handle_trigger(char *cmd)
 {
-    // ignore further signals
-    if (mbinit_usr_interrupt)
-        return;
-
-    // get command
-    char *cmd = util_get_file_contents(MBPATH_TRIGGER_CMD);
-    unlink(MBPATH_TRIGGER_CMD);
-    if (!cmd) goto finish;
+    multiboot_data = multiboot_get_data();
 
     LOGI("TRIGGER: %s\n", cmd);
 
@@ -220,23 +212,13 @@ static void mbinit_usr_handler(UNUSED int sig, siginfo_t *info, UNUSED void *vp)
         handle_on_post_fs_data();
     } else if (!strcmp(cmd, "post-fstab")) {
         handle_on_post_fstab();
+    } else {
+        LOGE("unknown trigger command: %s\n", cmd);
+        return -1;
     }
 
-    // cleanup
-    free(cmd);
-
-finish:
-    // continue sender
-    kill(info->si_pid, SIGUSR1);
+    return 0;
 }
-
-static volatile sig_atomic_t init_usr_interrupt = 0;
-static void init_usr_handler(UNUSED int sig, UNUSED siginfo_t *info, UNUSED void *vp)
-{
-    // stop waiting for signals
-    init_usr_interrupt = 1;
-}
-
 #define CHECK_WRITE(fd, str) \
         len = strlen(str); \
         bytes_written = write(fd, str, len); \
@@ -497,68 +479,46 @@ write_entry:
     }
 
     LOGI("Booting Android\n");
-    pid_t pid = safe_fork();
 
-    // parent
-    if (pid) {
-        // install usr handler
-        util_setsighandler(SIGUSR1, init_usr_handler);
+    // save state
+    state_save();
 
-        // wait for mbinit to finish
-        WAIT_FOR_SIGNAL(SIGUSR1, !init_usr_interrupt);
-
-        return run_init(0);
-    }
-
-    // child
-    else {
-        // add trigger events
-        SAFE_SNPRINTF_RET(LOGE, -1, buf, PATH_MAX, "\n\n"
-                          "on early-init\n"
-                          // wait for coldboot
-                          "    wait /dev/.coldboot_done\n"
-                          "\n"
-
-                          // start mbtrigger
-                          "    write "MBPATH_TRIGGER_CMD" early-init\n"
-                          "    start mbtrigger\n"
-                          "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
-
-                          // mbtrigger cleanup
-                          "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+    // add trigger events
+    rc = util_append_string_to_file("/init.rc", "\n\n"
+                                    "on early-init\n"
+                                    // wait for coldboot
+                                    "    wait /dev/.coldboot_done\n"
+                                    "\n"
 
 
-                          "on post-fs-data\n"
-                          // start mbtrigger
-                          "    write "MBPATH_TRIGGER_CMD" post-fs-data\n"
-                          "    start mbtrigger\n"
-                          "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
+                                    // start mbtrigger
+                                    "    write "MBPATH_TRIGGER_CMD" early-init\n"
+                                    "    start mbtrigger\n"
+                                    "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
 
-                          // mbtrigger cleanup
-                          "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
-                          "\n"
+                                    // mbtrigger cleanup
+                                    "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
 
-                          // trigger service
-                          "service mbtrigger "MBPATH_TRIGGER_BIN" %u\n"
-                          "    disabled\n"
-                          "    oneshot\n"
-                          "\n"
 
-                          , getpid()
-                         );
-        rc = util_append_string_to_file("/init.rc", buf);
-        if (rc) return rc;
+                                    "on post-fs-data\n"
+                                    // start mbtrigger
+                                    "    write "MBPATH_TRIGGER_CMD" post-fs-data\n"
+                                    "    start mbtrigger\n"
+                                    "    wait "MBPATH_TRIGGER_WAIT_FILE"\n"
 
-        // install trigger handler
-        util_setsighandler(SIGUSR1, mbinit_usr_handler);
+                                    // mbtrigger cleanup
+                                    "    rm "MBPATH_TRIGGER_WAIT_FILE"\n"
+                                    "\n"
 
-        // continue init
-        kill(getppid(), SIGUSR1);
 
-        // wait for trigger
-        WAIT_FOR_SIGNAL(SIGUSR1, !mbinit_usr_interrupt);
+                                    // trigger service
+                                    "service mbtrigger "MBPATH_TRIGGER_BIN"\n"
+                                    "    seclabel u:r:init_multiboot:s0\n"
+                                    "    disabled\n"
+                                    "    oneshot\n"
+                                    "\n");
+    if (rc) return rc;
 
-        // we are not allowed to return
-        exit(0);
-    }
+    // run init
+    return run_init(0);
 }

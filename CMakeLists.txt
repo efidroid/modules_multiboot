@@ -51,6 +51,7 @@ add_executable(init
     src/multiboot_init.c
     src/util.c
     src/safe.c
+    src/state.c
     src/boot_recovery.c
     src/boot_android.c
     src/syscalls/init.c
