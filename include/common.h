@@ -52,8 +52,8 @@
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
 #define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"
 #define MBPATH_TRIGGER_BIN "/trigger"
-#define MBPATH_TRIGGER_CMD "/multiboot/.trigger_cmd"
-#define MBPATH_TRIGGER_WAIT_FILE "/multiboot/.trigger_wait"
+#define MBPATH_TRIGGER_CMD MBPATH_ROOT "/.trigger_cmd"
+#define MBPATH_TRIGGER_WAIT_FILE MBPATH_ROOT "/.trigger_wait"
 #define MBPATH_STATEFILE MBPATH_ROOT "/mbstate"
 
 #define UNUSED __attribute__((unused))
