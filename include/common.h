@@ -51,7 +51,7 @@
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
 #define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"
-#define MBPATH_TRIGGER_BIN "/trigger"
+#define MBPATH_TRIGGER_BIN MBPATH_BIN "/trigger"
 #define MBPATH_TRIGGER_CMD MBPATH_ROOT "/.trigger_cmd"
 #define MBPATH_TRIGGER_WAIT_FILE MBPATH_ROOT "/.trigger_wait"
 #define MBPATH_STATEFILE MBPATH_ROOT "/mbstate"
