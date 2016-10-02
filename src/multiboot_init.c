@@ -342,7 +342,7 @@ static int selinux_fixup(void)
     // we need to manually restore these contexts
     util_append_string_to_file("/init.rc", "\n\n"
                                "on early-init\n"
-                               "    restorecon /init.multiboot\n"
+                               "    restorecon /multiboot_init\n"
                                "    restorecon /multiboot\n"
                                "    restorecon_recursive /multiboot/dev\n"
                                "\n"
