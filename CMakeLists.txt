@@ -2,8 +2,19 @@ cmake_minimum_required(VERSION 2.8)
 project(multiboot)
 set(CMAKE_BUILD_TYPE Release)
 
+add_custom_command(
+    OUTPUT file_contexts.bin
+
+    # dependencies
+    DEPENDS ${CMAKE_SOURCE_DIR}/file_contexts
+
+    COMMAND ${HOST_SELINUXTOOLS_OUT}/libselinux/utils/sefcontext_compile -o file_contexts.bin ${CMAKE_SOURCE_DIR}/file_contexts
+)
+
 set(CMAKE_PAYLOADS
     ${DEVICE_FSTAB}
+    file_contexts.bin
+    ${CMAKE_SOURCE_DIR}/file_contexts
 )
 set(CMAKE_PAYLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/files)
 set(CMAKE_PAYLOAD_OBJ ${CMAKE_PAYLOAD_DIR}.obj)
@@ -61,6 +72,8 @@ add_executable(init
     # libs
     lib/efivars.c
     lib/log.c
+    lib/sefbinparser.c
+    lib/sefsrcparser.c
     lib/uevent.c
     lib/android/bionic/strlcpy.c
     lib/android/bionic/strlcat.c
@@ -77,7 +90,7 @@ add_executable(init
 target_link_libraries(init
     mke2fs e2p support com_err ext2fs
     busybox
-    blkid uuid sepolicy_inject sepol6 sepol7 dynfilefs syshook inih payload fuse pthread dl
+    blkid uuid sepolicy_inject sepol6 sepol7 dynfilefs syshook inih payload fuse pthread dl pcre
 )
 include_directories(
     include

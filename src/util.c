@@ -15,6 +15,7 @@
 */
 
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -39,6 +40,8 @@
 
 #define LOG_TAG "UTIL"
 #include <lib/log.h>
+
+#define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))
 
 char *util_basename(const char *path)
 {
@@ -123,6 +126,11 @@ int util_exists(const char *filename, bool follow)
     return rc==0;
 }
 
+int util_startswith(const char *str, const char *pre)
+{
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
 uint64_t util_filesize(const char *filename, bool follow)
 {
     struct stat buffer;
@@ -195,7 +203,7 @@ int util_exec_main(int argc, char **argv, int (*mainfn)(int, char **))
     return status;
 }
 
-int util_append_string_to_file(const char *filename, const char *str)
+int util_append_buffer_to_file(const char *filename, const void *buf, size_t len)
 {
     int rc = 0;
 
@@ -204,8 +212,7 @@ int util_append_string_to_file(const char *filename, const char *str)
         return fd;
     }
 
-    size_t len = strlen(str);
-    size_t bytes_written = write(fd, str, len);
+    size_t bytes_written = write(fd, buf, len);
     if (bytes_written!=len) {
         rc = -errno;
         goto out;
@@ -215,6 +222,11 @@ out:
     close(fd);
 
     return rc;
+}
+
+int util_append_string_to_file(const char *filename, const char *str)
+{
+    return util_append_buffer_to_file(filename, str, strlen(str));
 }
 
 int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *))
@@ -846,4 +858,43 @@ part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor)
         }
     }
     return NULL;
+}
+
+void util_hexdump(const void *ptr, size_t len)
+{
+    uintptr_t address = (uintptr_t)ptr;
+    size_t count;
+
+    for (count = 0 ; count < len; count += 16) {
+        union {
+            uint32_t buf[4];
+            uint8_t  cbuf[16];
+        } u;
+        size_t s = ROUNDUP(MIN(len - count, 16), 4);
+        size_t i, j;
+
+        printf("0x%08x: ", address - (uintptr_t)ptr);
+        for (i = 0; i < s / 4; i++) {
+            u.buf[i] = ((const uint32_t *)address)[i];
+            for (j = 0; j < 4; j++)
+                printf("%02x ", u.cbuf[i*4 + j]);
+            printf(" ");
+            //printf("%08x ", u.buf[i]);
+        }
+        for (; i < 4; i++) {
+            printf("             ");
+        }
+        printf("|");
+
+        for (i=0; i < 16; i++) {
+            char c = u.cbuf[i];
+            if (i < s && isprint(c)) {
+                printf("%c", c);
+            } else {
+                printf(".");
+            }
+        }
+        printf("|\n");
+        address += 16;
+    }
 }

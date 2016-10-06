@@ -38,6 +38,8 @@
 
 #define MBPATH_ROOT "/multiboot"
 #define MBPATH_FSTAB MBPATH_ROOT "/fstab.multiboot"
+#define MBPATH_FILE_CONTEXTS MBPATH_ROOT "/file_contexts"
+#define MBPATH_FILE_CONTEXTS_BIN MBPATH_ROOT "/file_contexts.bin"
 #define MBPATH_PROC MBPATH_ROOT "/proc"
 #define MBPATH_DEV MBPATH_ROOT "/dev"
 #define MBPATH_SYS MBPATH_ROOT "/sys"

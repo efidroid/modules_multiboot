@@ -33,6 +33,8 @@
 #include <lib/cmdline.h>
 #include <lib/mounts.h>
 #include <lib/fs_mgr.h>
+#include <lib/sefbinparser.h>
+#include <lib/sefsrcparser.h>
 #include <blkid/blkid.h>
 #include <ini.h>
 #include <sepolicy_inject.h>
@@ -44,6 +46,8 @@
 #include <lib/log.h>
 
 PAYLOAD_IMPORT(fstab_multiboot);
+PAYLOAD_IMPORT(file_contexts);
+PAYLOAD_IMPORT(file_contexts_bin);
 static multiboot_data_t multiboot_data = {0};
 
 multiboot_data_t *multiboot_get_data(void)
@@ -237,6 +241,10 @@ static int selinux_fixup(void)
 
     void *handle = sepolicy_inject_open("/sepolicy");
     if (handle) {
+        // init_multiboot is free to do anything it wants :)
+        // also, this has to be first so our context gets created
+        sepolicy_inject_set_permissive(handle, "init_multiboot", 1);
+
         // init has to change our label
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "file", "relabelto");
 
@@ -263,9 +271,6 @@ static int selinux_fixup(void)
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "file", "getattr,execute,read,open");
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "process", "transition,rlimitinh,siginh,noatsecure");
         sepolicy_inject_add_rule(handle, "rootfs", "tmpfs", "filesystem", "associate");
-
-        // init_multiboot is free to do anything it wants :)
-        sepolicy_inject_set_permissive(handle, "init_multiboot", 1);
 
         // we still try to solve all the denials to keep dmesg clean
         sepolicy_inject_add_rule(handle, "init_multiboot", "rootfs", "filesystem", "associate");
@@ -301,6 +306,12 @@ static int selinux_fixup(void)
         sepolicy_inject_add_rule(handle, "init_multiboot", "proc", "dir", "search");
         sepolicy_inject_add_rule(handle, "init_multiboot", "proc", "lnk_file", "read");
 
+        // relabel rules for /multiboot/dev
+        sepolicy_inject_add_rule(handle, "init", "ram_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "loop_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "swap_block_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "sd_device", "blk_file", "relabelto");
+
         if (multiboot_data.is_multiboot) {
             // the loop images are not labeled
             sepolicy_inject_add_rule(handle, "kernel", "unlabeled", "file", "read");
@@ -323,32 +334,28 @@ static int selinux_fixup(void)
                                   );
     }
 
-    // give our files selinux contexts
-    util_append_string_to_file("/file_contexts", "\n\n"
-                               "/multiboot(/.*)?               u:object_r:rootfs:s0\n"
-                               "/multiboot/dev(/.*)?           u:object_r:device:s0\n"
-                               "/multiboot/dev/null            u:object_r:null_device:s0\n"
-                               "/multiboot/dev/zero            u:object_r:zero_device:s0\n"
-                               "/multiboot/dev/block(/.*)?     u:object_r:block_device:s0\n"
-                               "/init\\.multiboot              u:object_r:init_multiboot:s0\n"
+    if (util_exists("/file_contexts.bin", 1)) {
+        sefbin_file_t *seffile = sefbin_parse("/file_contexts.bin");
+        sefbin_file_t *seffile_mb = sefbin_parse(MBPATH_FILE_CONTEXTS_BIN);
+        sefbin_append(seffile, seffile_mb);
+        sefbin_append_multiboot_rules(seffile);
+        sefbin_write(seffile, "/file_contexts.bin");
+    }
 
-                               // prevent restorecon_recursive on multiboot directories
-                               "/data/media/multiboot(/.*)?          <<none>>\n"
-                               "/data/media/0/multiboot(/.*)?        <<none>>\n"
-                               "/realdata/media/multiboot(/.*)?      <<none>>\n"
-                               "/realdata/media/0/multiboot(/.*)?    <<none>>\n"
-                              );
+    if (util_exists("/file_contexts", 1)) {
+        util_append_buffer_to_file("/file_contexts", PAYLOAD_PTR(file_contexts), PAYLOAD_SIZE(file_contexts));
+        sefsrc_append_multiboot_rules("/file_contexts");
+    }
 
     // we need to manually restore these contexts
     util_append_string_to_file("/init.rc", "\n\n"
                                "on early-init\n"
                                "    restorecon /multiboot_init\n"
-                               "    restorecon /multiboot\n"
                                "    restorecon_recursive /multiboot/dev\n"
                                "\n"
                               );
 
-    // flush stdlib messages so the don't appear between the other logs
+    // flush stdlib messages so they don't appear between the other logs
     fflush(stderr);
     fflush(stdout);
 
@@ -1032,6 +1039,20 @@ int multiboot_main(UNUSED int argc, char **argv)
     rc = util_buf2file(PAYLOAD_PTR(fstab_multiboot), MBPATH_FSTAB, PAYLOAD_SIZE(fstab_multiboot));
     if (rc) {
         MBABORT("Can't extract fstab to "MBPATH_FSTAB": %s\n", strerror(errno));
+    }
+
+    // extract file_contexts
+    LOGD("extract %s\n", MBPATH_FILE_CONTEXTS);
+    rc = util_buf2file(PAYLOAD_PTR(file_contexts), MBPATH_FILE_CONTEXTS, PAYLOAD_SIZE(file_contexts));
+    if (rc) {
+        MBABORT("Can't extract file_contexts to "MBPATH_FILE_CONTEXTS": %s\n", strerror(errno));
+    }
+
+    // extract file_contexts.bin
+    LOGD("extract %s\n", MBPATH_FILE_CONTEXTS_BIN);
+    rc = util_buf2file(PAYLOAD_PTR(file_contexts_bin), MBPATH_FILE_CONTEXTS_BIN, PAYLOAD_SIZE(file_contexts_bin));
+    if (rc) {
+        MBABORT("Can't extract file_contexts.bin to "MBPATH_FILE_CONTEXTS_BIN": %s\n", strerror(errno));
     }
 
     // create symlinks

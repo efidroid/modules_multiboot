@@ -1,0 +1,7 @@
+
+/multiboot_init                u:object_r:init_multiboot:s0
+
+/data/media/multiboot(/.*)?          <<none>>
+/data/media/0/multiboot(/.*)?        <<none>>
+/realdata/media/multiboot(/.*)?      <<none>>
+/realdata/media/0/multiboot(/.*)?    <<none>>

@@ -42,8 +42,10 @@ char *util_basename(const char *path);
 char *util_dirname(const char *path);
 int util_buf2file(const void *buf, const char *filename, size_t size);
 int util_exists(const char *filename, bool follow);
+int util_startswith(const char *str, const char *pre);
 uint64_t util_filesize(const char *filename, bool follow);
 int util_mkdir(const char *dir);
+int util_append_buffer_to_file(const char *filename, const void *buf, size_t len);
 int util_append_string_to_file(const char *filename, const char *str);
 int util_setsighandler(int signum, void (*handler)(int, siginfo_t *, void *));
 int util_mount(const char *source, const char *target,
@@ -74,5 +76,6 @@ const char *util_get_file_extension(const char *filename);
 char *util_get_file_contents(const char *filename);
 char *util_get_esp_path_for_partition(const char *mountpoint, const char *name);
 part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor);
+void util_hexdump(const void *ptr, size_t len);
 
 #endif
