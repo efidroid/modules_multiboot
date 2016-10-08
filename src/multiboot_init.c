@@ -208,7 +208,7 @@ int run_init(int trace)
         int fd;
         for (fd=0; fd<10; fd++)
             close(fd);
-        ret = execve(par[0], par, NULL);
+        ret = execvp(par[0], par);
     }
 
     // error check
