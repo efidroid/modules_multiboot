@@ -17,5 +17,5 @@
 #ifndef _LIB_CMDLINE_H
 #define _LIB_CMDLINE_H
 
-void import_kernel_cmdline(void (*import_kernel_nv) (char *name));
+void import_kernel_cmdline(const char *path, void (*import_kernel_nv) (char *name));
 #endif

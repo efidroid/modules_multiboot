@@ -23,13 +23,13 @@
 
 #include <common.h>
 
-void import_kernel_cmdline(void (*import_kernel_nv) (char *name))
+void import_kernel_cmdline(const char *path, void (*import_kernel_nv) (char *name))
 {
 	char cmdline[1024];
 	char *ptr;
 	int fd;
 
-	fd = open(MBPATH_PROC"/cmdline", O_RDONLY);
+	fd = open(path, O_RDONLY);
 	if (fd >= 0) {
 		int n = read(fd, cmdline, 1023);
 		if (n < 0)

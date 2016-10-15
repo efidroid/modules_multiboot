@@ -1036,7 +1036,8 @@ int multiboot_main(UNUSED int argc, char **argv)
 
     // parse cmdline
     LOGD("parse cmdline\n");
-    import_kernel_cmdline(import_kernel_nv);
+    import_kernel_cmdline(MBPATH_PROC"/cmdline", import_kernel_nv);
+    import_kernel_cmdline("/multiboot_cmdline", import_kernel_nv);
 
     // parse /sys/block
     LOGD("parse /sys/block\n");
