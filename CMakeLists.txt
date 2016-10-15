@@ -75,6 +75,7 @@ add_executable(init
     lib/sefbinparser.c
     lib/sefsrcparser.c
     lib/uevent.c
+    lib/dmcrypt.c
     lib/android/bionic/strlcpy.c
     lib/android/bionic/strlcat.c
     lib/android/bionic/mntentex.c

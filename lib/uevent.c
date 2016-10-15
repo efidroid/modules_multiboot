@@ -320,6 +320,21 @@ int uevent_create_nodes(list_node_t *info, const char *path)
         return rc;
     }
 
+    // create device-mapper node
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "%s/device-mapper", path);
+    rc = mknod(buf, S_IFCHR | 0600, makedev(10, 236));
+    if (rc<0 && errno!=EEXIST) {
+        return rc;
+    }
+
+    return 0;
+}
+
+int uevent_get_blkdev_path(uevent_block_t *bi, char *buf, size_t bufsz)
+{
+    // build dev name
+    SAFE_SNPRINTF_RET(LOGE, -1, buf, bufsz, MBPATH_DEV"/block/%s", bi->devname);
+
     return 0;
 }
 
@@ -330,7 +345,8 @@ int uevent_mount(uevent_block_t *bi, const char *target,
     char buf[PATH_MAX];
 
     // build dev name
-    SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), MBPATH_DEV"/block/%s", bi->devname);
+    int rc = uevent_get_blkdev_path(bi, buf, sizeof(buf));
+    if (rc) return rc;
 
     // mount
     return util_mount(buf, target, filesystemtype, mountflags, data);

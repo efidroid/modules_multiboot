@@ -809,7 +809,7 @@ const char *util_get_file_extension(const char *filename)
     return dot + 1;
 }
 
-char *util_get_file_contents(const char *filename)
+char *util_get_file_contents_ex(const char *filename, size_t *psize)
 {
     char *buffer = NULL;
 
@@ -835,6 +835,9 @@ char *util_get_file_contents(const char *filename)
 
     buffer[size] = 0;
 
+    if (psize)
+        *psize = size;
+
     goto close_file;
 
 free_buffer:
@@ -845,6 +848,11 @@ close_file:
     fclose(fh);
 
     return buffer;
+}
+
+char *util_get_file_contents(const char *filename)
+{
+    return util_get_file_contents_ex(filename, NULL);
 }
 
 part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor)

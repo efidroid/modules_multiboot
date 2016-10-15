@@ -46,6 +46,7 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
 char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path);
 char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char *prefix);
 int uevent_create_nodes(list_node_t *info, const char *path);
+int uevent_get_blkdev_path(uevent_block_t *bi, char *buf, size_t bufsz);
 int uevent_mount(uevent_block_t *bi, const char *target,
                  const char *filesystemtype, unsigned long mountflags,
                  const void *data);

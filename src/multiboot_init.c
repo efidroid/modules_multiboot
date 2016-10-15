@@ -21,6 +21,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
@@ -35,6 +36,7 @@
 #include <lib/fs_mgr.h>
 #include <lib/sefbinparser.h>
 #include <lib/sefsrcparser.h>
+#include <lib/dmcrypt.h>
 #include <blkid/blkid.h>
 #include <ini.h>
 #include <sepolicy_inject.h>
@@ -971,6 +973,40 @@ static int setup_partition_replacements(void)
     return 0;
 }
 
+static char *efiguid2keyfile(const char *guid)
+{
+    int rc;
+    char *buf = safe_malloc(PATH_MAX);
+    char *ptr = buf;
+    size_t size_left = PATH_MAX;
+
+    rc = snprintf(ptr, size_left, MBPATH_DATA"/misc/vold/expand_");
+    if (SNPRINTF_ERROR(rc, size_left)) {
+        MBABORT("snprintf error\n");
+    }
+    ptr += rc;
+    size_left -= rc;
+
+    while (*guid) {
+        if (size_left==0) {
+            MBABORT("buffer is too small for guid\n");
+        }
+
+        if (*guid != '-') {
+            *ptr = tolower(*guid);
+
+            ptr++;
+            size_left -= rc;
+        }
+
+        guid++;
+    }
+
+    SAFE_SNPRINTF_RET(MBABORT, NULL, ptr, size_left, ".key");
+
+    return buf;
+}
+
 int multiboot_main(UNUSED int argc, char **argv)
 {
     int rc = 0;
@@ -1161,17 +1197,49 @@ int multiboot_main(UNUSED int argc, char **argv)
         }
         LOGI("Boot device: %s\n", multiboot_data.bootdev->devname);
 
-        // mount bootdev
-        LOGD("mount boot device\n");
-        rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, 0, NULL);
-        if (rc) {
-            MBABORT("Can't mount boot device: %s\n", strerror(errno));
-        }
-
         // mount data
         rc = util_mount_mbinipart("/data", MBPATH_DATA);
         if (rc) {
             MBABORT("Can't mount data: %s\n", strerror(errno));
+        }
+
+        LOGD("mount boot device\n");
+        if (!strcmp(multiboot_data.bootdev->partname, "android_expand")) {
+            char out_crypto_blkdev[MAXPATHLEN];
+            char real_blkdev[PATH_MAX];
+
+            // get keyfile path
+            char *keyfilepath = efiguid2keyfile(multiboot_data.guid);
+            LOGV("keyfilepath: %s\n", keyfilepath);
+
+            // open key
+            size_t keysize;
+            char *key = util_get_file_contents_ex(keyfilepath, &keysize);
+            if (!key) {
+                MBABORT("Can't read key data\n");
+            }
+
+            // get blk device
+            rc = uevent_get_blkdev_path(multiboot_data.bootdev, real_blkdev, sizeof(real_blkdev));
+            if (rc) {
+                MBABORT("Can't get path to block device\n");
+            }
+
+            // dmcrypt setup
+            rc = cryptfs_setup_ext_volume("multiboot_bootdev", real_blkdev, (unsigned char *)key, keysize, out_crypto_blkdev);
+            if (rc) {
+                MBABORT("Can't setup dmcrypt: %s\n", strerror(errno));
+            }
+
+            // mount
+            rc = util_mount(out_crypto_blkdev, MBPATH_BOOTDEV, NULL, 0, NULL);
+        } else {
+            // mount
+            rc = uevent_mount(multiboot_data.bootdev, MBPATH_BOOTDEV, NULL, 0, NULL);
+        }
+
+        if (rc) {
+            MBABORT("Can't mount boot device: %s\n", strerror(errno));
         }
 
         // get data layout version
@@ -1192,7 +1260,7 @@ int multiboot_main(UNUSED int argc, char **argv)
 
         // check for bind-mount support
         LOGV("search mounted bootdev\n");
-        const mounted_volume_t *volume = find_mounted_volume_by_majmin(&mounts_state, multiboot_data.bootdev->major, multiboot_data.bootdev->minor, 0);
+        const mounted_volume_t *volume = find_mounted_volume_by_mount_point(&mounts_state, MBPATH_BOOTDEV);
         if (!volume) {
             MBABORT("boot device not mounted (DAFUQ?)\n");
         }
