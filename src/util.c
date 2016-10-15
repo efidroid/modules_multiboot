@@ -436,6 +436,12 @@ int util_shell(const char *cmd)
     return util_exec_main(3, (char **)args, busybox_main);
 }
 
+int util_replace(const char *filename, const char *regex)
+{
+    const char *args[] = {"sed", "-i", regex, filename, 0};
+    return util_exec_main(3, (char **)args, busybox_main);
+}
+
 char *util_get_fstype(const char *filename)
 {
     const char *type;
