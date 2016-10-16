@@ -257,6 +257,61 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
     return NULL;
 }
 
+static char *get_parent_devname(uevent_block_t *bi)
+{
+    char sid[100];
+
+    // convert id to string
+    ssize_t sid_len = snprintf(sid, sizeof(sid), "%u", bi->partn);
+    if (SNPRINTF_ERROR(sid_len, sizeof(sid)))
+        return NULL;
+
+    // check if the id can be part of the name
+    size_t name_len = strlen(bi->devname);
+    if ((size_t)sid_len>=name_len)
+        return NULL;
+
+    // check if the devname ends with the id
+    const char *name_suffix = &bi->devname[name_len-sid_len];
+    if (strcmp(name_suffix, sid))
+        return NULL;
+
+    // duplicate name
+    char *parentdevname = safe_strdup(bi->devname);
+
+    // remove id part
+    parentdevname[name_len - sid_len] = 0;
+
+    return parentdevname;
+}
+
+uevent_block_t *get_blockinfo_for_sisterpart(list_node_t *info, uevent_block_t *bi, unsigned int id)
+{
+    char buf[PATH_MAX];
+    ssize_t bytes_written;
+    char *parentdevname = NULL;
+    uevent_block_t *ret = NULL;
+
+    // get parent devname
+    parentdevname = get_parent_devname(bi);
+    if (!parentdevname)
+        return NULL;
+
+    // build new devname
+    bytes_written = snprintf(buf, sizeof(buf), "%s%u", parentdevname, id);
+    if (SNPRINTF_ERROR(bytes_written, sizeof(buf)))
+        goto done;
+
+    // get device
+    ret = get_blockinfo_for_devname(info, buf);
+
+done:
+    free(parentdevname);
+
+    return ret;
+}
+
+
 char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char *prefix)
 {
     uevent_block_t *bi = get_blockinfo_for_path(info, path);

@@ -860,6 +860,34 @@ static int setup_partition_replacements(void)
         if (!multiboot_data.is_recovery) {
             prepare_multiboot_data();
         }
+
+        // bootdev is already mounted, so redirect it to a bind mount
+        part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
+        pthread_mutex_init(&replacement->lock, NULL);
+        replacement->uevent_block = multiboot_data.bootdev;
+        replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_BIND;
+        replacement->iomode = PART_REPLACEMENT_IOMODE_DENY;
+        replacement->bindsource = safe_strdup(MBPATH_BOOTDEV);
+
+        // check if this is adoptable storage
+        if (multiboot_data.bootdev->partname && !strcmp(multiboot_data.bootdev->partname, "android_expand")) {
+            uevent_block_t *bi_meta = get_blockinfo_for_sisterpart(multiboot_data.blockinfo, multiboot_data.bootdev, 1);
+            if (!bi_meta)
+                MBABORT("can't find meta partition of adoptable storage");
+
+            // create denial-redirection for android_expand
+            part_replacement_t *replacementmeta = safe_calloc(sizeof(part_replacement_t), 1);
+            pthread_mutex_init(&replacementmeta->lock, NULL);
+            replacementmeta->uevent_block = replacement->uevent_block;
+            replacementmeta->mountmode = PART_REPLACEMENT_MOUNTMODE_DENY;
+            replacementmeta->iomode = PART_REPLACEMENT_IOMODE_DENY;
+            list_add_tail(&multiboot_data.replacements, &replacementmeta->node);
+
+            // redirect android_meta instead
+            replacement->uevent_block = bi_meta;
+        }
+
+        list_add_tail(&multiboot_data.replacements, &replacement->node);
     }
 
     // internal system

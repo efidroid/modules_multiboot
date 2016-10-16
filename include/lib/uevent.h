@@ -43,6 +43,7 @@ void free_block_devices(list_node_t *info);
 uevent_block_t *get_blockinfo_for_path(list_node_t *info, const char *path);
 uevent_block_t *get_blockinfo_for_partname(list_node_t *info, const char *partname);
 uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname);
+uevent_block_t *get_blockinfo_for_sisterpart(list_node_t *info, uevent_block_t *bi, unsigned int id);
 char *uevent_realpath(list_node_t *info, const char *path, char *resolved_path);
 char *uevent_realpath_prefix(list_node_t *info, const char *path, char *resolved_path, const char *prefix);
 int uevent_create_nodes(list_node_t *info, const char *path);
