@@ -113,25 +113,41 @@ typedef struct {
     const char *datamedia_target;
 } multiboot_data_t;
 
+
+typedef enum {
+    PART_REPLACEMENT_MOUNTMODE_ALLOW = 0,
+    PART_REPLACEMENT_MOUNTMODE_DENY,
+    PART_REPLACEMENT_MOUNTMODE_LOOP,
+    PART_REPLACEMENT_MOUNTMODE_BIND,
+} part_replacement_mountmode_t;
+
+typedef enum {
+    PART_REPLACEMENT_IOMODE_ALLOW = 0,
+    PART_REPLACEMENT_IOMODE_DENY,
+    PART_REPLACEMENT_IOMODE_REDIRECT,
+} part_replacement_iomode_t;
+
 typedef struct {
     list_node_t node;
     pthread_mutex_t lock;
 
     uevent_block_t *uevent_block;
 
-    // raw part for loop, stub part for bind
+    part_replacement_mountmode_t mountmode;
+    part_replacement_iomode_t iomode;
+
+    // mount: bind
+    char *bindsource;
+
+    // mount: loop, also used for direct IO
     char *loopdevice;
-    char *loopfile;
+
+    // optional, for delayed losetup
     int losetup_done;
+    char *loopfile;
+
     // optional, file to sync changes to
     char *loop_sync_target;
-
-    struct {
-        multiboot_partition_t *part;
-
-        // bind
-        char *partpath;
-    } multiboot;
 } part_replacement_t;
 
 

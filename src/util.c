@@ -795,16 +795,29 @@ close_file:
     return rc;
 }
 
-part_replacement_t *util_get_replacement_by_name(const char *name)
+part_replacement_t *util_get_replacement_by_mbfstabname(const char *name)
 {
     multiboot_data_t *multiboot_data = multiboot_get_data();
 
+    // get fstab partition
+    struct fstab_rec *rec = fs_mgr_get_by_name(multiboot_data->mbfstab, name);
+    if (!rec) {
+        return NULL;
+    }
+
+    // get blockinfo
+    uevent_block_t *block = get_blockinfo_for_path(multiboot_data->blockinfo, rec->blk_device);
+    if (!block) {
+        return NULL;
+    }
+
+    // get replacement partition for this block
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if (replacement->multiboot.part && !strcmp(replacement->multiboot.part->name, name)) {
+        if (replacement->uevent_block==block)
             return replacement;
-        }
     }
+
     return NULL;
 }
 

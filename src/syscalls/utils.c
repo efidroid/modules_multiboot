@@ -267,7 +267,7 @@ int lindev_from_mountpoint(const char *mountpoint, unsigned *major, unsigned *mi
     return 0;
 }
 
-static int syshookutil_handle_close_native(part_replacement_t *replacement)
+static int syshookutil_handle_close_synctarget(part_replacement_t *replacement)
 {
     int rc;
     const char *mountpoint = NULL;
@@ -360,16 +360,17 @@ static int syshookutil_handle_close_native(part_replacement_t *replacement)
     return 0;
 }
 
-static int syshookutil_handle_close_multiboot(part_replacement_t *replacement)
+static int syshookutil_handle_close_formatdetect(part_replacement_t *replacement)
 {
     int rc;
     char buf[PATH_MAX];
 
-    if (replacement->multiboot.part->type==MBPART_TYPE_BIND) {
+    if (replacement->loopdevice) {
         // mount loop
+        // TODO: use random path
         SAFE_MOUNT(replacement->loopdevice, MBPATH_STUB, NULL, 0, NULL);
 
-        // create id file
+        // check if id file exists
         if (!util_exists(MBPATH_STUB_IDFILE, false)) {
             LOGI("%s got formatted!\n", replacement->loopdevice);
 
@@ -381,12 +382,12 @@ static int syshookutil_handle_close_multiboot(part_replacement_t *replacement)
             close(fd);
 
             // build format command
-            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->multiboot.partpath);
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_BUSYBOX" rm -Rf %s/*", replacement->bindsource);
 
             // format bind source
             rc = util_shell(buf);
             if (rc) {
-                MBABORT("Can't format bind source at %s\n", replacement->multiboot.partpath);
+                MBABORT("Can't format bind source at %s\n", replacement->bindsource);
             }
         }
 
@@ -414,7 +415,7 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
             MBABORT("formatted ESP in multiboot mode\n");
         }
 
-        return syshookutil_handle_close_native(NULL);
+        return syshookutil_handle_close_synctarget(NULL);
     }
 
     // get replacement
@@ -423,17 +424,26 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
         return 0;
     }
 
+    // lock
     pthread_mutex_lock(&replacement->lock);
-    if (replacement->multiboot.part) {
-        rc = syshookutil_handle_close_multiboot(replacement);
+
+    // validate mode for native recovery
+    if (!syshook_multiboot_data->is_multiboot) {
+        if (!(replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP && replacement->loop_sync_target)) {
+            MBABORT("in native recovery, all replacements should be synced\n");
+            rc = -1;
+        }
+    }
+
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
+        rc = syshookutil_handle_close_formatdetect(replacement);
     } else if (replacement->loop_sync_target) {
-        rc = syshookutil_handle_close_native(replacement);
-    } else if (!syshook_multiboot_data->is_multiboot) {
-        MBABORT("in native recovery, all replacements should be synced\n");
-        rc = -1;
+        rc = syshookutil_handle_close_synctarget(replacement);
     } else {
         rc = 0;
     }
+
+    // unlock
     pthread_mutex_unlock(&replacement->lock);
 
     return rc;

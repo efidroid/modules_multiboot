@@ -71,7 +71,7 @@ int util_mount_mbinipart(const char *name, const char *mountpoint);
 char *util_get_property(const char *filename, const char *propertyname);
 int util_read_int(const char *filename, uint32_t *pvalue);
 int util_write_int(char const *path, int value);
-part_replacement_t *util_get_replacement_by_name(const char *name);
+part_replacement_t *util_get_replacement_by_mbfstabname(const char *name);
 const char *util_get_file_extension(const char *filename);
 char *util_get_file_contents_ex(const char *filename, size_t *psize);
 char *util_get_file_contents(const char *filename);

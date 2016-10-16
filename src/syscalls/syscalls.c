@@ -102,6 +102,14 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
         goto run_syscall;
     }
 
+    if (replacement->iomode==PART_REPLACEMENT_IOMODE_ALLOW) {
+        return syshook_invoke_hookee(process);
+    } else if (replacement->iomode==PART_REPLACEMENT_IOMODE_DENY) {
+        return -1;
+    } else if (replacement->iomode!=PART_REPLACEMENT_IOMODE_REDIRECT) {
+        MBABORT("invalid iomode %d\n", replacement->iomode);
+    }
+
     // copy loopdevice to child
     uabspath_len = strlen(replacement->loopdevice)+1;
     uabspath = syshookutils_copy_to_child(process, replacement->loopdevice, uabspath_len);
@@ -185,25 +193,25 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
     }
 
     // bind
-    if (replacement->multiboot.part && replacement->multiboot.part->type==MBPART_TYPE_BIND) {
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
         // copy dir_name to our space
         kdirname[0] = 0;
         syshook_strncpy_user(process, kdirname, dir_name, sizeof(kdirname));
 
         // mount directly
-        ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND, NULL);
-        LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
+        ret = mount(replacement->bindsource, kdirname, NULL, MS_BIND, NULL);
+        LOGV("%s: bind mount %s at %s = %d\n", __func__, replacement->bindsource, kdirname, (int)ret);
 
         // remount to apply requested mount-flags
         if (ret==0) {
-            ret = mount(replacement->multiboot.partpath, kdirname, NULL, MS_BIND|MS_REMOUNT|flags, data);
-            LOGV("%s: bind re-mount %s at %s = %d\n", __func__, replacement->multiboot.partpath, kdirname, (int)ret);
+            ret = mount(replacement->bindsource, kdirname, NULL, MS_BIND|MS_REMOUNT|flags, data);
+            LOGV("%s: bind re-mount %s at %s = %d\n", __func__, replacement->bindsource, kdirname, (int)ret);
         }
         return ret;
     }
 
     // loop
-    else {
+    else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
         // use loop device
         udevname_len = strlen(replacement->loopdevice)+1;
         udevname = syshookutils_copy_to_child(process, replacement->loopdevice, udevname_len);
@@ -214,11 +222,25 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         syshook_argument_set(process, 0, (long)udevname);
     }
 
+    // allow
+    else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_ALLOW) {
+        goto continue_syscall;
+    }
+
+    // deny
+    else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_DENY) {
+        return -1;
+    }
+
+    else {
+        MBABORT("invalid mountmode %d\n", replacement->mountmode);
+    }
+
 continue_syscall:
     ret = syshook_invoke_hookee(process);
 
     if (replacement) {
-        LOGV("%s: redirect %s -> %s = %d\n", __func__, kdevname, replacement->loopdevice, (int)ret);
+        //LOGV("%s: redirect %s -> %s = %d\n", __func__, kdevname, replacement->loopdevice, (int)ret);
     }
 
     if (udevname) {

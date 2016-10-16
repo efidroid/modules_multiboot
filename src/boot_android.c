@@ -77,12 +77,24 @@ static void handle_on_early_init(void)
             goto finish;
         }
 
-        LOGD("replace %s with %s\n", blk_device, replacement->loopdevice);
+        const char *replacement_device;
+        if (replacement->iomode==PART_REPLACEMENT_IOMODE_ALLOW) {
+            continue;
+        } else if (replacement->iomode==PART_REPLACEMENT_IOMODE_DENY) {
+            replacement_device = "/dev/null";
+        } else if (replacement->iomode==PART_REPLACEMENT_IOMODE_REDIRECT) {
+            replacement_device = replacement->loopdevice;
+        } else {
+            MBABORT_IF_MB("invalid iomode %d\n", replacement->iomode);
+            goto finish;
+        }
+
+        LOGD("replace %s with %s\n", blk_device, replacement_device);
 
         // stat loop device
-        rc = stat(replacement->loopdevice, &sb_loop);
+        rc = stat(replacement_device, &sb_loop);
         if (rc) {
-            MBABORT_IF_MB("Can't stat device at %s\n", replacement->loopdevice);
+            MBABORT_IF_MB("Can't stat device at %s\n", replacement_device);
             goto finish;
         }
 
@@ -163,7 +175,7 @@ static void handle_on_post_fs_data(void)
 
     part_replacement_t *replacement;
     list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
-        if (!replacement->losetup_done) {
+        if (!replacement->losetup_done && replacement->loopdevice) {
             if (!replacement->loopfile) {
                 MBABORT_IF_MB("loopfile required for %s\n", replacement->loopdevice);
                 goto finish;
@@ -196,7 +208,7 @@ static void handle_on_post_fstab(void)
 {
     remount_entry_t *entry;
     list_for_every_entry(&remount_entries, entry, remount_entry_t, node) {
-        SAFE_MOUNT(entry->replacement->multiboot.partpath, entry->rec->mount_point, entry->rec->fs_type, MS_REMOUNT|MS_BIND|entry->rec->flags, entry->rec->fs_options);
+        SAFE_MOUNT(entry->replacement->bindsource, entry->rec->mount_point, entry->rec->fs_type, MS_REMOUNT|MS_BIND|entry->rec->flags, entry->rec->fs_options);
     }
 }
 
@@ -309,23 +321,30 @@ static int process_file(FILE *fp_orig, FILE *fp_out)
             // get replacement for this device
             part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
             if (!replacement) goto write_unmodified;
-            multiboot_partition_t *part = replacement->multiboot.part;
 
             const char *blk_device;
             const char *mnt_flags = rest;
             // determine mount args
-            if (part && part->type==MBPART_TYPE_BIND) {
-                blk_device = replacement->multiboot.partpath;
+            if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
+                blk_device = replacement->bindsource;
                 mnt_flags = "bind";
-            } else {
+            } else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
                 blk_device = replacement->loopdevice;
+            } else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_DENY) {
+                // next entry
+                continue;
+            } else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_ALLOW) {
+                goto write_unmodified;
+            } else {
+                LOGE("invalid mountmode %d\n", replacement->mountmode);
+                return -1;
             }
 
             // write modified command
             fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, mnt_flags);
 
             // remount to apply requested mount-flags
-            if (part && part->type==MBPART_TYPE_BIND) {
+            if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
                 SAFE_SNPRINTF_RET(LOGE, -1, buf, sizeof(buf), "remount,bind,%s", rest);
                 fprintf(fp_out, "    mount %s %s %s %s\n", type, blk_device, path, buf);
             }
@@ -444,16 +463,19 @@ int boot_android(void)
             // get replacement for this device
             part_replacement_t *replacement = util_get_replacement(uevent_block->major, uevent_block->minor);
             if (!replacement) goto write_entry;
-            multiboot_partition_t *part = replacement->multiboot.part;
 
             // determine mount args
-            if (part && part->type==MBPART_TYPE_BIND) {
-                blk_device = replacement->multiboot.partpath;
+            if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
+                blk_device = replacement->bindsource;
                 mnt_flags = "bind";
 
                 add_remount_entry(rec, replacement);
-            } else {
+            } else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
                 blk_device = replacement->loopdevice;
+            } else if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_DENY) {
+                continue;
+            } else if (replacement->mountmode!=PART_REPLACEMENT_MOUNTMODE_ALLOW) {
+                LOGE("invalid mountmode %d\n", replacement->mountmode);
             }
 
             // write entry

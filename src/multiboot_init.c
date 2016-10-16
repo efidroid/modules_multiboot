@@ -544,12 +544,12 @@ static uint32_t get_mb_sdk_version(void)
     ssize_t bytecount;
     int rc;
 
-    part_replacement_t *replacement = util_get_replacement_by_name("system");
+    part_replacement_t *replacement = util_get_replacement_by_mbfstabname("system");
     if (!replacement) {
         MBABORT("Can't find replacement partition for system\n");
     }
 
-    if (replacement->multiboot.part->type==MBPART_TYPE_LOOP) {
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
         // mount system
         rc = util_mount(replacement->loopdevice, MBPATH_MB_SYSTEM, NULL, 0, NULL);
         if (rc) {
@@ -558,7 +558,7 @@ static uint32_t get_mb_sdk_version(void)
 
         systempath = MBPATH_MB_SYSTEM;
     } else {
-        systempath = replacement->multiboot.partpath;
+        systempath = replacement->bindsource;
     }
 
     // read sdk version
@@ -577,7 +577,7 @@ static uint32_t get_mb_sdk_version(void)
     }
 
     // unmount system
-    if (replacement->multiboot.part->type==MBPART_TYPE_LOOP) {
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
         SAFE_UMOUNT(MBPATH_MB_SYSTEM);
     }
 
@@ -605,13 +605,13 @@ static void prepare_multiboot_data(void)
         layout_version_needed = 3;
 
     // get data replacement
-    part_replacement_t *replacement = util_get_replacement_by_name("data");
+    part_replacement_t *replacement = util_get_replacement_by_mbfstabname("data");
     if (!replacement) {
         MBABORT("Can't find replacement partition for data\n");
     }
 
     // mount data partition
-    if (replacement->multiboot.part->type==MBPART_TYPE_LOOP) {
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
         // mount system
         rc = util_mount(replacement->loopdevice, MBPATH_MB_DATA, NULL, 0, NULL);
         if (rc) {
@@ -620,7 +620,7 @@ static void prepare_multiboot_data(void)
 
         datapath = MBPATH_MB_DATA;
     } else {
-        datapath = replacement->multiboot.partpath;
+        datapath = replacement->bindsource;
     }
 
     // get layout version
@@ -677,7 +677,7 @@ static void prepare_multiboot_data(void)
     multiboot_data.datamedia_target = datamedia_target;
     multiboot_data.datamedia_source = datamedia_source;
 
-    if (replacement->multiboot.part->type==MBPART_TYPE_LOOP) {
+    if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP) {
         SAFE_UMOUNT(MBPATH_MB_DATA);
     }
 }
@@ -744,6 +744,7 @@ static int setup_partition_replacements(void)
             char *loopfile = NULL;
             if (part->type==MBPART_TYPE_BIND) {
                 // create directory
+                // TODO: don't do that
                 if (rc==-ENOENT) {
                     rc = util_mkdir(partpath);
                     if (rc) {
@@ -835,12 +836,21 @@ static int setup_partition_replacements(void)
 
             part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
             pthread_mutex_init(&replacement->lock, NULL);
+            replacement->uevent_block = part->uevent_block;
+            if (part->type==MBPART_TYPE_BIND)
+                replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_BIND;
+            else if (part->type==MBPART_TYPE_LOOP)
+                replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_LOOP;
+            else
+                MBABORT("invalid mbpart type %d\n", part->type);
+            replacement->iomode = PART_REPLACEMENT_IOMODE_REDIRECT;
+            if (part->type==MBPART_TYPE_BIND)
+                replacement->bindsource = partpath;
+            replacement->losetup_done = 1;
             replacement->loopdevice = loopdevice;
             replacement->loopfile = loopfile;
-            replacement->losetup_done = 1;
-            replacement->multiboot.part = part;
-            replacement->multiboot.partpath = partpath;
-            replacement->uevent_block = part->uevent_block;
+
+
             list_add_tail(&multiboot_data.replacements, &replacement->node);
         }
 
@@ -952,11 +962,14 @@ static int setup_partition_replacements(void)
 
         part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
         pthread_mutex_init(&replacement->lock, NULL);
+        replacement->uevent_block = bi;
+        replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_LOOP;
+        replacement->iomode = PART_REPLACEMENT_IOMODE_REDIRECT;
+        replacement->losetup_done = losetup_done;
         replacement->loopdevice = safe_strdup(buf);
         replacement->loopfile = safe_strdup(loopfile);
-        replacement->losetup_done = losetup_done;
         replacement->loop_sync_target = loop_sync_target;
-        replacement->uevent_block = bi;
+
         list_add_tail(&multiboot_data.replacements, &replacement->node);
 
         // cleanup

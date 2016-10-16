@@ -286,12 +286,13 @@ static void write_replacements(int fd, list_node_t *replacements)
         write_ptr(fd, replacement);
 
         write_ptr(fd, replacement->uevent_block);
+        write_primitive(fd, replacement->mountmode);
+        write_primitive(fd, replacement->iomode);
+        write_str(fd, replacement->bindsource);
+        write_primitive(fd, replacement->losetup_done);
         write_str(fd, replacement->loopdevice);
         write_str(fd, replacement->loopfile);
-        write_primitive(fd, replacement->losetup_done);
         write_str(fd, replacement->loop_sync_target);
-        write_ptr(fd, replacement->multiboot.part);
-        write_str(fd, replacement->multiboot.partpath);
     }
 }
 
@@ -321,13 +322,15 @@ static void read_replacements(int fd, list_node_t *replacements)
         part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
         register_ptr(oldptr_replacement, replacement, sizeof(*replacement));
 
+        pthread_mutex_init(&replacement->lock, NULL);
         require_ptr(fd, (void **)&replacement->uevent_block);
+        read_primitive(fd, &replacement->mountmode);
+        read_primitive(fd, &replacement->iomode);
+        read_str(fd, &replacement->bindsource);
+        read_primitive(fd, &replacement->losetup_done);
         read_str(fd, &replacement->loopdevice);
         read_str(fd, &replacement->loopfile);
-        read_primitive(fd, &replacement->losetup_done);
         read_str(fd, &replacement->loop_sync_target);
-        require_ptr(fd, (void **)&replacement->multiboot.part);
-        read_str(fd, &replacement->multiboot.partpath);
 
         list_add_tail(replacements, &replacement->node);
     }
