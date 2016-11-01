@@ -77,6 +77,9 @@ typedef struct {
 } multiboot_partition_t;
 
 typedef struct {
+    // thread safety
+    pthread_mutex_t lock;
+
     int is_multiboot;
     int is_recovery;
 

@@ -411,8 +411,14 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
     if (!syshook_multiboot_data->is_multiboot) {
         // check if this was the ESP
         if (fdinfo->major==syshook_multiboot_data->espdev->major && fdinfo->minor==syshook_multiboot_data->espdev->minor) {
+            pthread_mutex_lock(&syshook_multiboot_data->lock);
+
             // sync all replacements because the real ESP just got formatted
-            return syshookutil_handle_close_synctarget(NULL);
+            rc = syshookutil_handle_close_synctarget(NULL);
+
+            pthread_mutex_unlock(&syshook_multiboot_data->lock);
+
+            return rc;
         }
     }
 
@@ -422,9 +428,6 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
         return 0;
     }
 
-    // lock
-    pthread_mutex_lock(&replacement->lock);
-
     // validate mode for native recovery
     if (!syshook_multiboot_data->is_multiboot) {
         if (!(replacement->iomode==PART_REPLACEMENT_IOMODE_REDIRECT && replacement->loop_sync_target)) {
@@ -432,15 +435,21 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
         }
     }
 
+    // lock replacement
+    pthread_mutex_lock(&replacement->lock);
+
     if (replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_BIND) {
         rc = syshookutil_handle_close_formatdetect(replacement);
     } else if (replacement->loop_sync_target) {
+        // we need to hold the global lock to prevent running at the same time as a full ESP restore
+        pthread_mutex_lock(&syshook_multiboot_data->lock);
         rc = syshookutil_handle_close_synctarget(replacement);
+        pthread_mutex_unlock(&syshook_multiboot_data->lock);
     } else {
         rc = 0;
     }
 
-    // unlock
+    // unlock replacement
     pthread_mutex_unlock(&replacement->lock);
 
     return rc;

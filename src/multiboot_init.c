@@ -1068,6 +1068,7 @@ int multiboot_main(UNUSED int argc, char **argv)
     char buf[PATH_MAX];
 
     // basic multiboot_data init
+    pthread_mutex_init(&multiboot_data.lock, NULL);
     list_initialize(&multiboot_data.replacements);
 
     // init logging

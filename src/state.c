@@ -419,6 +419,8 @@ int state_restore(void)
         return -1;
     }
 
+    pthread_mutex_init(&multiboot_data->lock, NULL);
+
     list_initialize(&ptr_registered);
     list_initialize(&ptr_required);
 
