@@ -408,14 +408,12 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
         return 0;
     }
 
-    // check if this was the ESP
-    if (fdinfo->major==syshook_multiboot_data->espdev->major && fdinfo->minor==syshook_multiboot_data->espdev->minor) {
-        // THIS SHOULD NEVER HAPPEN
-        if (syshook_multiboot_data->is_multiboot) {
-            MBABORT("formatted ESP in multiboot mode\n");
+    if (!syshook_multiboot_data->is_multiboot) {
+        // check if this was the ESP
+        if (fdinfo->major==syshook_multiboot_data->espdev->major && fdinfo->minor==syshook_multiboot_data->espdev->minor) {
+            // sync all replacements because the real ESP just got formatted
+            return syshookutil_handle_close_synctarget(NULL);
         }
-
-        return syshookutil_handle_close_synctarget(NULL);
     }
 
     // get replacement
@@ -429,9 +427,8 @@ int syshook_handle_fd_close(fdinfo_t *fdinfo)
 
     // validate mode for native recovery
     if (!syshook_multiboot_data->is_multiboot) {
-        if (!(replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_LOOP && replacement->loop_sync_target)) {
+        if (!(replacement->iomode==PART_REPLACEMENT_IOMODE_REDIRECT && replacement->loop_sync_target)) {
             MBABORT("in native recovery, all replacements should be synced\n");
-            rc = -1;
         }
     }
 
