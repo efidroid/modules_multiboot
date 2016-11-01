@@ -464,7 +464,7 @@ static multiboot_partition_t *multiboot_part_by_name(const char *name)
     return NULL;
 }
 
-static void find_bootdev(int update)
+static int find_bootdev(int update)
 {
     int rc;
 
@@ -480,13 +480,48 @@ static void find_bootdev(int update)
     }
 
     multiboot_data.bootdev = get_blockinfo_for_guid(multiboot_data.guid);
+    if (!multiboot_data.bootdev)
+        return -1;
+
+    return 0;
 }
 
-static void wait_for_bootdev(void)
+static int find_espdev(int update)
+{
+    int rc;
+
+    if (update) {
+        // rescan
+        add_new_block_devices(multiboot_data.blockinfo);
+
+        // update devfs
+        rc = uevent_create_nodes(multiboot_data.blockinfo, MBPATH_DEV);
+        if (rc) {
+            MBABORT("Can't build devfs: %s\n", strerror(errno));
+        }
+    }
+
+    multiboot_data.espdev = get_blockinfo_for_path(multiboot_data.blockinfo, multiboot_data.esp->blk_device);
+    if (!multiboot_data.espdev)
+        return -1;
+
+    return 0;
+}
+
+static void wait_for_device(int (*find_device)(int update))
 {
     struct sockaddr_nl nls;
     struct pollfd pfd;
     char buf[512];
+    int rc;
+
+    // check if the device is already available
+    rc = find_device(0);
+    if (rc==0) {
+        return;
+    }
+
+    LOGE("Device not found. waiting for changes.\n");
 
     // initialize memory
     memset(&nls,0,sizeof(struct sockaddr_nl));
@@ -506,8 +541,8 @@ static void wait_for_bootdev(void)
 
     // we do this because the device could have become available between
     // us searching for the first time and setting up the socket
-    find_bootdev(1);
-    if (multiboot_data.bootdev) {
+    rc = find_device(1);
+    if (rc==0) {
         goto close_socket;
     }
 
@@ -521,8 +556,8 @@ static void wait_for_bootdev(void)
         // we don't check the event type here and just rescan the block devices everytime
 
         // search for bootdev
-        find_bootdev(1);
-        if (multiboot_data.bootdev) {
+        rc = find_device(1);
+        if (rc==0) {
             goto close_socket;
         }
         LOGE("Boot device still not found. continue waiting.\n");
@@ -1225,8 +1260,9 @@ int multiboot_main(UNUSED int argc, char **argv)
     if (!multiboot_data.esp) {
         MBABORT("ESP partition not found\n");
     }
+
     LOGV("get blockinfo for ESP\n");
-    multiboot_data.espdev = get_blockinfo_for_path(multiboot_data.blockinfo, multiboot_data.esp->blk_device);
+    wait_for_device(find_espdev);
     if (!multiboot_data.espdev) {
         MBABORT("can't get blockinfo for ESP\n");
     }
@@ -1238,16 +1274,7 @@ int multiboot_main(UNUSED int argc, char **argv)
 
         // get boot device
         LOGD("search for boot device\n");
-
-        find_bootdev(0);
-        if (!multiboot_data.bootdev) {
-            LOGE("Boot device not found. waiting for changes.\n");
-        }
-
-        // wait until we found it
-        wait_for_bootdev();
-
-        // just to make sure we really found it
+        wait_for_device(find_bootdev);
         if (!multiboot_data.bootdev) {
             MBABORT("Boot device not found\n");
         }
