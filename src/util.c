@@ -887,6 +887,19 @@ part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor)
     return NULL;
 }
 
+part_replacement_t *util_get_replacement_by_ueventblock(uevent_block_t *block)
+{
+    multiboot_data_t *multiboot_data = multiboot_get_data();
+
+    part_replacement_t *replacement;
+    list_for_every_entry(&multiboot_data->replacements, replacement, part_replacement_t, node) {
+        if (replacement->uevent_block==block) {
+            return replacement;
+        }
+    }
+    return NULL;
+}
+
 void util_hexdump(const void *ptr, size_t len)
 {
     uintptr_t address = (uintptr_t)ptr;

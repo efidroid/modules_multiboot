@@ -77,6 +77,7 @@ char *util_get_file_contents_ex(const char *filename, size_t *psize);
 char *util_get_file_contents(const char *filename);
 char *util_get_esp_path_for_partition(const char *mountpoint, const char *name);
 part_replacement_t *util_get_replacement(unsigned int major, unsigned int minor);
+part_replacement_t *util_get_replacement_by_ueventblock(uevent_block_t *block);
 void util_hexdump(const void *ptr, size_t len);
 int util_replace(const char *filename, const char *regex);
 

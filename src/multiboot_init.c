@@ -862,12 +862,23 @@ static int setup_partition_replacements(void)
         }
 
         // bootdev is already mounted, so redirect it to a bind mount
-        part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
-        pthread_mutex_init(&replacement->lock, NULL);
-        replacement->uevent_block = multiboot_data.bootdev;
-        replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_BIND;
-        replacement->iomode = PART_REPLACEMENT_IOMODE_DENY;
-        replacement->bindsource = safe_strdup(MBPATH_BOOTDEV);
+        int found_replacement = 1;
+        part_replacement_t *replacement = util_get_replacement_by_ueventblock(multiboot_data.bootdev);
+        if (!replacement) {
+            found_replacement = 0;
+            replacement = safe_calloc(sizeof(part_replacement_t), 1);
+            pthread_mutex_init(&replacement->lock, NULL);
+            replacement->uevent_block = multiboot_data.bootdev;
+        }
+
+        if (!found_replacement || replacement->mountmode==PART_REPLACEMENT_MOUNTMODE_ALLOW) {
+            replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_BIND;
+            replacement->bindsource = safe_strdup(MBPATH_BOOTDEV);
+        }
+
+        if (!found_replacement || replacement->iomode==PART_REPLACEMENT_IOMODE_ALLOW) {
+            replacement->iomode = PART_REPLACEMENT_IOMODE_DENY;
+        }
 
         // check if this is adoptable storage
         if (multiboot_data.bootdev->partname && !strcmp(multiboot_data.bootdev->partname, "android_expand")) {
@@ -887,7 +898,9 @@ static int setup_partition_replacements(void)
             replacement->uevent_block = bi_meta;
         }
 
-        list_add_tail(&multiboot_data.replacements, &replacement->node);
+        if (!found_replacement) {
+            list_add_tail(&multiboot_data.replacements, &replacement->node);
+        }
     }
 
     // internal system
