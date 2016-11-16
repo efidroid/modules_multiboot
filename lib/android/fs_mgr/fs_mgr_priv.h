@@ -26,6 +26,7 @@
 __BEGIN_DECLS
 
 #define INFO(x...)    LOGI(x)
+#define WARNING(x...) LOGW(x)
 #define ERROR(x...)   LOGE(x)
 
 #define CRYPTO_TMPFS_OPTIONS "size=256m,mode=0771,uid=1000,gid=1000"

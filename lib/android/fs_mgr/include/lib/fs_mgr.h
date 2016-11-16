@@ -69,6 +69,7 @@ struct fstab_rec {
     int swap_prio;
     unsigned int zram_size;
     unsigned int zram_streams;
+    unsigned int file_encryption_mode;
     char *esp;
 };
 
@@ -90,6 +91,7 @@ int fs_mgr_mount_all(struct fstab *fstab);
 
 #define FS_MGR_DOMNT_FAILED -1
 #define FS_MGR_DOMNT_BUSY -2
+
 int fs_mgr_do_mount(struct fstab *fstab, char *n_name, char *n_blk_device,
                     char *tmp_mount_point);
 int fs_mgr_do_tmpfs_mount(char *n_name);
@@ -113,12 +115,14 @@ int fs_mgr_is_nonremovable(const struct fstab_rec *fstab);
 int fs_mgr_is_verified(const struct fstab_rec *fstab);
 int fs_mgr_is_encryptable(const struct fstab_rec *fstab);
 int fs_mgr_is_file_encrypted(const struct fstab_rec *fstab);
+const char* fs_mgr_get_file_encryption_mode(const struct fstab_rec *fstab);
 int fs_mgr_is_convertible_to_fbe(const struct fstab_rec *fstab);
 int fs_mgr_is_noemulatedsd(const struct fstab_rec *fstab);
 int fs_mgr_is_notrim(struct fstab_rec *fstab);
 int fs_mgr_is_formattable(struct fstab_rec *fstab);
 int fs_mgr_is_nofail(struct fstab_rec *fstab);
 int fs_mgr_swapon_all(struct fstab *fstab);
+int fs_mgr_is_mdtp_activated(void);
 int fs_mgr_is_multiboot(const struct fstab_rec *fstab);
 int fs_mgr_is_uefi(const struct fstab_rec *fstab);
 int fs_mgr_is_nvvars(const struct fstab_rec *fstab);
