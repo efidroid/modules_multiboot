@@ -92,7 +92,7 @@ static void *datadup(void *data, size_t sz)
     return ndata;
 }
 
-sefbin_file_t *sefbin_parse(const char *filename)
+sefbin_file_t *sefbin_parse(const char *filename, int allow_magicerror)
 {
     uint32_t magic;
     uint32_t num_stems;
@@ -112,7 +112,10 @@ sefbin_file_t *sefbin_parse(const char *filename)
     // magic
     safe_read(fd, &magic, sizeof(magic));
     if (magic!=SELINUX_MAGIC_COMPILED_FCONTEXT) {
-        MBABORT("invalid magic: 0x%08x\n", magic);
+        if (allow_magicerror)
+            LOGE("invalid magic: 0x%08x\n", magic);
+        else
+            MBABORT("invalid magic: 0x%08x\n", magic);
         return NULL;
     }
 

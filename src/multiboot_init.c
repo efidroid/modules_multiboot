@@ -337,11 +337,18 @@ static int selinux_fixup(void)
     }
 
     if (util_exists("/file_contexts.bin", 1)) {
-        sefbin_file_t *seffile = sefbin_parse("/file_contexts.bin");
-        sefbin_file_t *seffile_mb = sefbin_parse(MBPATH_FILE_CONTEXTS_BIN);
-        sefbin_append(seffile, seffile_mb);
-        sefbin_append_multiboot_rules(seffile);
-        sefbin_write(seffile, "/file_contexts.bin");
+        sefbin_file_t *seffile = sefbin_parse("/file_contexts.bin", 1);
+        if (seffile) {
+            sefbin_file_t *seffile_mb = sefbin_parse(MBPATH_FILE_CONTEXTS_BIN, 0);
+            sefbin_append(seffile, seffile_mb);
+            sefbin_append_multiboot_rules(seffile);
+            sefbin_write(seffile, "/file_contexts.bin");
+        }
+
+        else {
+            util_append_buffer_to_file("/file_contexts.bin", PAYLOAD_PTR(file_contexts), PAYLOAD_SIZE(file_contexts));
+            sefsrc_append_multiboot_rules("/file_contexts.bin");
+        }
     }
 
     if (util_exists("/file_contexts", 1)) {

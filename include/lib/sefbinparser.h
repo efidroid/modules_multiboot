@@ -50,7 +50,7 @@ typedef struct  {
     list_node_t specs;
 } sefbin_file_t;
 
-sefbin_file_t *sefbin_parse(const char *filename);
+sefbin_file_t *sefbin_parse(const char *filename, int allow_magicerror);
 int sefbin_write(sefbin_file_t *seffile, const char *filename);
 int sefbin_append(sefbin_file_t *dst, sefbin_file_t *src);
 int sefbin_append_multiboot_rules(sefbin_file_t *dst);
