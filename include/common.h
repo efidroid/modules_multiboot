@@ -103,6 +103,7 @@ typedef struct {
     // boot device
     char *guid;
     char *path;
+    char *pttype;
     uevent_block_t *bootdev;
     int bootdev_supports_bindmount;
 

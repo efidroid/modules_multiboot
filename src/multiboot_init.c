@@ -72,13 +72,18 @@ static void import_kernel_nv(char *name)
     if (!strcmp(name, "multibootpath")) {
         char guid[37];
         char *path = NULL;
+        char *pttype = NULL;
 
         // check type
         const char *format = NULL;
-        if (!strncmp(value, "GPT", 3))
+        if (!strncmp(value, "GPT", 3)){
+            pttype = strdup("gpt");
             format = "GPT,%36s,%ms";
-        else if (!strncmp(value, "MBR", 3))
+        }
+        else if (!strncmp(value, "MBR", 3)) {
+            pttype = strdup("dos");
             format = "MBR,%11s,%ms";
+        }
         else {
             MBABORT("invalid multibootpath: %s\n", value);
             return;
@@ -90,6 +95,7 @@ static void import_kernel_nv(char *name)
             return;
         }
 
+        multiboot_data.pttype = pttype;
         multiboot_data.guid = safe_strdup(guid);
         multiboot_data.path = path;
     }

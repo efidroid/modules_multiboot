@@ -388,6 +388,7 @@ int state_save(void)
     write_replacements(fd, &multiboot_data->replacements);
     write_str(fd, multiboot_data->guid);
     write_str(fd, multiboot_data->path);
+    write_str(fd, multiboot_data->pttype);
     write_ptr(fd, multiboot_data->bootdev);
     write_primitive(fd, multiboot_data->bootdev_supports_bindmount);
 
@@ -437,6 +438,7 @@ int state_restore(void)
     read_replacements(fd, &multiboot_data->replacements);
     read_str(fd, &multiboot_data->guid);
     read_str(fd, &multiboot_data->path);
+    read_str(fd, &multiboot_data->pttype);
     require_ptr(fd, (void **)&multiboot_data->bootdev);
     read_primitive(fd, &multiboot_data->bootdev_supports_bindmount);
 
