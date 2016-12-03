@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
@@ -119,7 +120,7 @@ static void import_kernel_nv(char *name)
     }
 }
 
-static uevent_block_t *get_blockinfo_for_guid(const char *guid)
+static uevent_block_t *get_blockinfo_for_guid(const char *pttype, const char *guid)
 {
     int rc = 0;
     blkid_tag_iterate iter;
@@ -145,6 +146,8 @@ static uevent_block_t *get_blockinfo_for_guid(const char *guid)
         if (rc<0) {
             MBABORT("chroot error: %s\n", strerror(errno));
         }
+
+        int is_zerombr = (!strcmp(pttype, "dos") && strlen(guid)==11 && !strncmp(guid, "00000000", 8));
 
         uevent_block_t *event;
         list_for_every_entry(multiboot_data.blockinfo, event, uevent_block_t, node) {
@@ -172,6 +175,22 @@ static uevent_block_t *get_blockinfo_for_guid(const char *guid)
                         // so while the actual memory is (or may be) different, the address is the same
                         *result = event;
                         exit(0);
+                    }
+                }
+
+                else if(is_zerombr && !strcmp(type, "PTTYPE")){
+                    if (!strcasecmp(value, "dos")) {
+                        unsigned long ptnumber = strtoul (&guid[9], NULL, 10);
+                        rc = snprintf(path, sizeof(path), "%sp%"PRIuPTR, event->devname, (unsigned int)ptnumber);
+                        if (SNPRINTF_ERROR(rc, sizeof(path))) {
+                            MBABORT("snprintf error\n");
+                        }
+
+                        uevent_block_t *dospart_block = get_blockinfo_for_devname(multiboot_data.blockinfo, path);
+                        if (dospart_block) {
+                            *result = dospart_block;
+                            exit(0);
+                        }
                     }
                 }
             }
@@ -492,7 +511,7 @@ static int find_bootdev(int update)
         }
     }
 
-    multiboot_data.bootdev = get_blockinfo_for_guid(multiboot_data.guid);
+    multiboot_data.bootdev = get_blockinfo_for_guid(multiboot_data.pttype, multiboot_data.guid);
     if (!multiboot_data.bootdev)
         return -1;
 
@@ -1300,7 +1319,7 @@ int multiboot_main(UNUSED int argc, char **argv)
         }
 
         LOGD("mount boot device\n");
-        if (!strcmp(multiboot_data.bootdev->partname, "android_expand")) {
+        if (multiboot_data.bootdev->partname && !strcmp(multiboot_data.bootdev->partname, "android_expand")) {
             char out_crypto_blkdev[MAXPATHLEN];
             char real_blkdev[PATH_MAX];
 
