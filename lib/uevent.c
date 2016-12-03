@@ -249,7 +249,7 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
 {
     uevent_block_t *event;
     list_for_every_entry(info, event, uevent_block_t, node) {
-        if (event->partname && !strcmp(event->devname, devname)) {
+        if (event->devname && !strcmp(event->devname, devname)) {
             return event;
         }
     }
