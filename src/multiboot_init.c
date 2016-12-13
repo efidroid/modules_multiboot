@@ -291,6 +291,11 @@ static int selinux_fixup(void)
         sepolicy_inject_add_rule(handle, "init", "block_device", "blk_file", "relabelto");
         sepolicy_inject_add_rule(handle, "init", "block_device", "dir", "relabelto");
         sepolicy_inject_add_rule(handle, "init", "device", "dir", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "dm_device", "chr_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "frp_block_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "oem_block_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "root_block_device", "blk_file", "relabelto");
+        sepolicy_inject_add_rule(handle, "init", "rpmb_device", "blk_file", "relabelto");
 
         // let init run our trigger
         sepolicy_inject_add_rule(handle, "init", "init", "process", "execmem");
