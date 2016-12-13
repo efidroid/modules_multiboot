@@ -272,6 +272,10 @@ static int selinux_fixup(void)
         // also, this has to be first so our context gets created
         sepolicy_inject_set_permissive(handle, "init_multiboot", 1);
 
+        // for some reason our binary needs execmem
+        sepolicy_inject_add_rule(handle, "init", "init", "process", "execmem");
+        sepolicy_inject_add_rule(handle, "kernel", "kernel", "process", "execmem");
+
         // init has to change our label
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "file", "relabelto");
 
@@ -298,7 +302,6 @@ static int selinux_fixup(void)
         sepolicy_inject_add_rule(handle, "init", "rpmb_device", "blk_file", "relabelto");
 
         // let init run our trigger
-        sepolicy_inject_add_rule(handle, "init", "init", "process", "execmem");
         sepolicy_inject_add_rule(handle, "init", "rootfs", "file", "create,write,unlink");
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "file", "getattr,execute,read,open");
         sepolicy_inject_add_rule(handle, "init", "init_multiboot", "process", "transition,rlimitinh,siginh,noatsecure");
