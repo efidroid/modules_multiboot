@@ -343,8 +343,8 @@ int util_losetup_free(const char *device)
 
 static int util_mke2fs(const char *device, const char *fstype)
 {
-    const char *args[] = {"mke2fs", "-t", fstype, "-m", "0", "-F", device, 0};
-    return util_exec_main(7, (char **)args, mke2fs_main);
+    const char *args[] = {"mke2fs", "-t", fstype, "-O", "^64bit", "-m", "0", "-F", device, 0};
+    return util_exec_main(9, (char **)args, mke2fs_main);
 }
 
 int util_mkfs(const char *device, const char *fstype)
