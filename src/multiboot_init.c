@@ -347,10 +347,11 @@ static int selinux_fixup(void)
         sepolicy_inject_add_rule(handle, "init", "root_block_device", "blk_file", "relabelto");
         sepolicy_inject_add_rule(handle, "init", "rpmb_device", "blk_file", "relabelto");
 
-        if (multiboot_data.is_multiboot) {
-            // the loop images are not labeled
-            sepolicy_inject_add_rule(handle, "kernel", "unlabeled", "file", "read");
+        // the kernel thread for loop images is checked by selinux too
+        sepolicy_inject_add_rule(handle, "kernel", "unlabeled", "file", "read");
+        sepolicy_inject_add_rule(handle, "kernel", "media_rw_data_file", "file", "read");
 
+        if (multiboot_data.is_multiboot) {
             // this is for the datamedia bind-mount
             sepolicy_inject_add_rule(handle, "init", "media_rw_data_file", "dir", "mounton");
         }
