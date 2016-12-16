@@ -100,7 +100,7 @@ static char *efivar_getdev(void)
 {
     // check if blockinfo is available
     multiboot_data_t *mbdata = multiboot_get_data();
-    if (!mbdata || !mbdata->blockinfo) goto err;
+    if (!mbdata || !mbdata->blockinfo || !mbdata->mbfstab) goto err;
 
     // get fstab rec for nvvars partition
     struct fstab_rec *rec = fs_mgr_nvvars(mbdata->mbfstab);
@@ -120,11 +120,11 @@ static char *efivar_getdev(void)
         return strdup(EFIVARDEV);
     }
 
+err:
     // give up
     LOGE("Can't find efivars partition\n");
 
-err:
-    return strdup(DEVICE_NVVARS_PARTITION);
+    return NULL;
 }
 
 static int efivar_read_to_buf(const char *device, void **buf, uint32_t *outdatasize)
@@ -135,6 +135,11 @@ static int efivar_read_to_buf(const char *device, void **buf, uint32_t *outdatas
     int rc = 0;
     efivar_hdr_t hdr;
     uint8_t *data = NULL;
+
+    if (!device) {
+        LOGE("nvvars device is NULL\n");
+        return -1;
+    }
 
     // open device
     fd = open(device, O_RDONLY);
@@ -213,6 +218,11 @@ static int efivar_write_from_buf(const char *device, void *data, uint32_t datasi
     int fd;
     size_t nbytes;
     int rc = 0;
+
+    if (!device) {
+        LOGE("nvvars device is NULL\n");
+        return -1;
+    }
 
     // open device
     fd = open(device, O_WRONLY);

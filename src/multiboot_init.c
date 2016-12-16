@@ -48,7 +48,6 @@
 #define LOG_TAG "INIT"
 #include <lib/log.h>
 
-PAYLOAD_IMPORT(fstab_multiboot);
 PAYLOAD_IMPORT(file_contexts);
 PAYLOAD_IMPORT(file_contexts_bin);
 static multiboot_data_t multiboot_data = {0};
@@ -1189,6 +1188,21 @@ int multiboot_main(UNUSED int argc, char **argv)
         MBABORT("Can't build devfs: %s\n", strerror(errno));
     }
 
+    // move fstab.multiboot
+    LOGD("move %s\n", MBPATH_FSTAB);
+    rc = util_cp("/multiboot_fstab", MBPATH_FSTAB);
+    if (rc) {
+        MBABORT("Can't move fstab to "MBPATH_FSTAB": %d\n", rc);
+    }
+    unlink("/multiboot_fstab");
+
+    // parse multiboot fstab
+    LOGD("parse %s\n", MBPATH_FSTAB);
+    multiboot_data.mbfstab = fs_mgr_read_fstab(MBPATH_FSTAB);
+    if (!multiboot_data.mbfstab) {
+        MBABORT("Can't parse multiboot fstab: %s\n", strerror(errno));
+    }
+
     // check for hwname
     LOGV("verify hw name\n");
     if (!multiboot_data.hwname) {
@@ -1200,13 +1214,6 @@ int multiboot_main(UNUSED int argc, char **argv)
     rc = util_mkdir(MBPATH_BIN);
     if (rc) {
         MBABORT("Can't create directory '"MBPATH_BIN"': %s\n", strerror(errno));
-    }
-
-    // extract fstab.multiboot
-    LOGD("extract %s\n", MBPATH_FSTAB);
-    rc = util_buf2file(PAYLOAD_PTR(fstab_multiboot), MBPATH_FSTAB, PAYLOAD_SIZE(fstab_multiboot));
-    if (rc) {
-        MBABORT("Can't extract fstab to "MBPATH_FSTAB": %s\n", strerror(errno));
     }
 
     // extract file_contexts
@@ -1240,13 +1247,6 @@ int multiboot_main(UNUSED int argc, char **argv)
     rc = symlink(argv[0], MBPATH_MKE2FS);
     if (rc) {
         MBABORT("Can't create symlink "MBPATH_MKE2FS": %s\n", strerror(errno));
-    }
-
-    // parse multiboot fstab
-    LOGD("parse %s\n", MBPATH_FSTAB);
-    multiboot_data.mbfstab = fs_mgr_read_fstab(MBPATH_FSTAB);
-    if (!multiboot_data.mbfstab) {
-        MBABORT("Can't parse multiboot fstab: %s\n", strerror(errno));
     }
 
     // verify mbfstab partitions

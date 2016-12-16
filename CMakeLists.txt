@@ -12,7 +12,6 @@ add_custom_command(
 )
 
 set(CMAKE_PAYLOADS
-    ${DEVICE_FSTAB}
     file_contexts.bin
     ${CMAKE_SOURCE_DIR}/file_contexts
 )
@@ -51,7 +50,6 @@ set_target_properties(payload PROPERTIES
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -Wshadow")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc -Wl,-static")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections -Wl,-gc-sections -Os -s")
-add_definitions(-DDEVICE_NVVARS_PARTITION="${DEVICE_NVVARS_PARTITION}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMPLEFILENAME='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINI_STOP_ON_FIRST_ERROR=1")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64")
