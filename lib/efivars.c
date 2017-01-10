@@ -77,13 +77,13 @@ typedef unsigned long addr_t;
 typedef int (*efivar_callback_t)(void *pdata, const uint16_t *name, const uint32_t namesize, const void *data,
                                  const uint32_t datasize, efi_guid_t guid, uint32_t attributes);
 
-static int copy_ansi2unicodestr(uint16_t **outdst, const char *src, size_t *outsz)
+static int copy_ansi2unicodestr(uint16_t **outdst, const char *src, uint32_t *outsz)
 {
     uint16_t *dst = NULL;
     size_t sz = (strlen(src)+1)*sizeof(uint16_t);
 
     *outdst = dst = malloc(sz);
-    if (!dst) return (int)dst;
+    if (!dst) return -ENOMEM;
 
     while (*src) {
         *(dst++) = *(src++);

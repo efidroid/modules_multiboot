@@ -180,7 +180,7 @@ static uevent_block_t *get_blockinfo_for_guid(const char *pttype, const char *gu
                 else if(is_zerombr && !strcmp(type, "PTTYPE")){
                     if (!strcasecmp(value, "dos")) {
                         unsigned long ptnumber = strtoul (&guid[9], NULL, 10);
-                        rc = snprintf(path, sizeof(path), "%sp%"PRIuPTR, event->devname, (unsigned int)ptnumber);
+                        rc = snprintf(path, sizeof(path), "%sp%"PRIuPTR, event->devname, (uintptr_t)ptnumber);
                         if (SNPRINTF_ERROR(rc, sizeof(path))) {
                             MBABORT("snprintf error\n");
                         }

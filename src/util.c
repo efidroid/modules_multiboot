@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <libgen.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -645,7 +646,7 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
 
     // build size
     char *ssize = safe_malloc(PATH_MAX);
-    SAFE_SNPRINTF_RET(LOGE, -1, ssize, PATH_MAX, "-s%llu", size);
+    SAFE_SNPRINTF_RET(LOGE, -1, ssize, PATH_MAX, "-s%"PRIu64, size);
 
     // tool
     par[i++] = "dynfilefs";
@@ -913,7 +914,7 @@ void util_hexdump(const void *ptr, size_t len)
         size_t s = ROUNDUP(MIN(len - count, 16), 4);
         size_t i, j;
 
-        printf("0x%08x: ", address - (uintptr_t)ptr);
+        printf("0x%08"PRIxPTR": ", address - (uintptr_t)ptr);
         for (i = 0; i < s / 4; i++) {
             u.buf[i] = ((const uint32_t *)address)[i];
             for (j = 0; j < 4; j++)

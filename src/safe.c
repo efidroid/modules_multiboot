@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 char *safe_strdup(const char *s)
 {
@@ -30,7 +31,7 @@ void *safe_malloc(size_t size)
 {
     char *ret = malloc(size);
     if (!ret) {
-        MBABORT("malloc(%u): %s\n", size, strerror(ENOMEM));
+        MBABORT("malloc(%"PRIuPTR"): %s\n", size, strerror(ENOMEM));
     }
 
     return ret;
@@ -40,7 +41,7 @@ void *safe_calloc(size_t num, size_t size)
 {
     char *ret = calloc(num, size);
     if (!ret) {
-        MBABORT("calloc(%u, %u): %s\n", num, size, strerror(ENOMEM));
+        MBABORT("calloc(%"PRIuPTR", %"PRIuPTR"): %s\n", num, size, strerror(ENOMEM));
     }
 
     return ret;
