@@ -75,7 +75,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!strcmp(progname, "multiboot_init")) {
+    if (!strcmp(progname, "multiboot_init") || !strcmp(progname, "init") ) {
         if (argc>=2) {
             if (!strcmp(argv[1], "trigger")) {
                 return trigger_main();
