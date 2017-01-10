@@ -28,7 +28,7 @@ char *syshookutils_child_getcwd(syshook_process_t *process, char *buf, size_t si
     if (!ubuf) return NULL;
 
     // call getcwd
-    if (syshook_invoke_syscall(process, SYS_getcwd, ubuf, size)) {
+    if (syshook_invoke_syscall(process, syshook_scno_to_native(process, SYSHOOK_SCNO_getcwd), ubuf, size)) {
         syshook_strncpy_user(process, buf, ubuf, size);
         ret = buf;
     }

@@ -15,9 +15,8 @@
 
 #include "syscalls_private.h"
 
-#define register_syscall(name) sys_call_table[SYS_##name] = sys_##name;
+#define register_syscall(name) syshook_register_syscall_handler(context, SYSHOOK_SCNO_##name, sys_##name)
 
-static void *sys_call_table[SYSHOOK_NUM_SYSCALLS] = {0};
 multiboot_data_t *syshook_multiboot_data = NULL;
 
 static int multiboot_trace_create_process(UNUSED syshook_process_t *process)
@@ -116,6 +115,11 @@ int multiboot_exec_tracee(char **par)
 {
     syshook_multiboot_data = multiboot_get_data();
 
+    syshook_context_t *context = syshook_create_context();
+    context->create_process = multiboot_trace_create_process;
+    context->destroy_process = multiboot_trace_destroy_process;
+    context->execve_process = multiboot_trace_execve_process;
+
     register_syscall(openat);
     register_syscall(open);
     register_syscall(close);
@@ -127,10 +131,5 @@ int multiboot_exec_tracee(char **par)
     register_syscall(fcntl64);
     register_syscall(execve);
 
-    syshook_context_t *context = syshook_create_context(sys_call_table);
-    context->create_process = multiboot_trace_create_process;
-    context->destroy_process = multiboot_trace_destroy_process;
-    context->execve_process = multiboot_trace_execve_process;
-
-    return syshook_execvp_ex(context, par);
+    return syshook_execvp(context, par);
 }

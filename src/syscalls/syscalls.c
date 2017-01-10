@@ -64,7 +64,7 @@ SYSCALL_DEFINE3(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
     return SYSC_fcntl64(process, fd, cmd, arg);
 }
 
-SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNUSED mode_t, mode)
+static long do_openat(syshook_process_t *process, int is_openat, int dfd, const char __user *filename, int flags, UNUSED mode_t mode)
 {
     int rc;
     long ret;
@@ -118,7 +118,7 @@ SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNU
     }
 
     // use loop device
-    syshook_argument_set(process, scno==SYS_openat?1:0, (long)uabspath);
+    syshook_argument_set(process, scno==is_openat?1:0, (long)uabspath);
 
 run_syscall:
     ret = syshook_invoke_hookee(process);
@@ -138,9 +138,14 @@ run_syscall:
     return ret;
 }
 
+SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, UNUSED mode_t, mode)
+{
+    return do_openat(process, 1, dfd, filename, flags, mode);
+}
+
 SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, mode_t, mode)
 {
-    return SYSC_openat(process, AT_FDCWD, filename, flags, mode);
+    return do_openat(process, 0, AT_FDCWD, filename, flags, mode);
 }
 
 SYSCALL_DEFINE1(close, unsigned int, fd)
