@@ -86,6 +86,10 @@ int main(int argc, char **argv)
             } else if (!strcmp(argv[1], "dynfilefs")) {
                 log_init();
                 return dynfilefs_main(argc-1, argv+1);
+            } else if (!strcmp(argv[1], "trace")) {
+                log_set_level(0);
+                syshook_context_t *context = syshook_create_context();
+                return syshook_execvp(context, argv+2);
             }
         } else {
             multiboot_main(argc, argv);
