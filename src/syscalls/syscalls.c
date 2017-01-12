@@ -210,6 +210,11 @@ SYSCALL_DEFINE5(mount, UNUSED char __user *, dev_name, UNUSED char __user *, dir
         if (ret==0) {
             ret = mount(replacement->bindsource, kdirname, NULL, MS_BIND|MS_REMOUNT|flags, data);
             LOGV("%s: bind re-mount %s at %s = %d\n", __func__, replacement->bindsource, kdirname, (int)ret);
+
+            // remove first mount on error
+            if(ret) {
+                umount(kdirname);
+            }
         }
         return ret;
     }
