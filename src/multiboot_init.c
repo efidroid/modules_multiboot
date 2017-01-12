@@ -864,7 +864,7 @@ static int setup_partition_replacements(void)
                 // setup loop device
                 rc = util_losetup(loopdevice, buf, false);
                 if (rc) {
-                    MBABORT("Can't setup loop device at %s for %s\n", loopdevice, buf);
+                    MBABORT("Can't setup loop device at %s for %s: %d\n", loopdevice, buf, rc);
                 }
 
                 // get fstype
@@ -901,7 +901,7 @@ static int setup_partition_replacements(void)
                 loopfile = safe_strdup(partpath);
                 rc = util_losetup(loopdevice, loopfile, false);
                 if (rc) {
-                    MBABORT("Can't setup loop device at %s for %s\n", loopdevice, loopfile);
+                    MBABORT("Can't setup loop device at %s for %s: %d\n", loopdevice, loopfile, rc);
                 }
             }
 
@@ -1071,7 +1071,7 @@ static int setup_partition_replacements(void)
             // setup loop device
             rc = util_losetup(buf, loopfile, false);
             if (rc) {
-                MBABORT("Can't setup loop device at %s for %s\n", buf, buf2);
+                MBABORT("Can't setup loop device at %s for %s: %d\n", buf, buf2, rc);
             }
             losetup_done = 1;
         }

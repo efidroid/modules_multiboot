@@ -185,7 +185,7 @@ static void handle_on_post_fs_data(void)
             LOGD("losetup %s with %s\n", replacement->loopdevice, replacement->loopfile);
             rc = util_losetup(replacement->loopdevice, replacement->loopfile, false);
             if (rc) {
-                MBABORT_IF_MB("Can't setup loop device at %s for %s\n", replacement->loopdevice, replacement->loopfile);
+                MBABORT_IF_MB("Can't setup loop device at %s for %s: %d\n", replacement->loopdevice, replacement->loopfile, rc);
                 goto finish;
             }
         }
