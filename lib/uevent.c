@@ -257,7 +257,7 @@ uevent_block_t *get_blockinfo_for_devname(list_node_t *info, const char *devname
     return NULL;
 }
 
-static char *get_parent_devname(uevent_block_t *bi)
+char *get_parent_devname(uevent_block_t *bi)
 {
     char sid[100];
 

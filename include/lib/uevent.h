@@ -37,6 +37,7 @@ typedef struct {
     uevent_block_type_t type;
 } uevent_block_t;
 
+char *get_parent_devname(uevent_block_t *bi);
 list_node_t *get_block_devices(void);
 void add_new_block_devices(list_node_t *info);
 void free_block_devices(list_node_t *info);
