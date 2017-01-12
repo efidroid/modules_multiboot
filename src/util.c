@@ -652,7 +652,7 @@ int util_dynfilefs(const char *_source, const char *_target, uint64_t size)
     par[i++] = "dynfilefs";
 
     par[i++] = "-o";
-    par[i++] = "direct_io,kernel_cache";
+    par[i++] = "kernel_cache";
 
     // size
     par[i++] = ssize;
