@@ -70,7 +70,6 @@ static long do_openat(syshook_process_t *process, int is_openat, int dfd, const 
     long ret;
     char kfilename[PATH_MAX];
     char abspath[PATH_MAX*2 + 1];
-    long scno = syshook_syscall_get(process);
     char __user *uabspath = NULL;
     size_t uabspath_len = 0;
     part_replacement_t *replacement = NULL;
@@ -118,7 +117,7 @@ static long do_openat(syshook_process_t *process, int is_openat, int dfd, const 
     }
 
     // use loop device
-    syshook_argument_set(process, scno==is_openat?1:0, (long)uabspath);
+    syshook_argument_set(process, is_openat?1:0, (long)uabspath);
 
 run_syscall:
     ret = syshook_invoke_hookee(process);
