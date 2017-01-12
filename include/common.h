@@ -50,6 +50,7 @@
 #define MBPATH_DATA MBPATH_ROOT "/data"
 #define MBPATH_MB_SYSTEM MBPATH_ROOT "/mb_system"
 #define MBPATH_MB_DATA MBPATH_ROOT "/mb_data"
+#define MBPATH_EFS MBPATH_ROOT "/efs"
 #define MBPATH_STUB_IDFILE MBPATH_STUB "/.idfile"
 #define MBPATH_BUSYBOX MBPATH_BIN "/busybox"
 #define MBPATH_MKE2FS MBPATH_BIN "/mke2fs"

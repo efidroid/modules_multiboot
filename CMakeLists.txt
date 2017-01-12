@@ -90,7 +90,7 @@ add_executable(init
 target_link_libraries(init
     mke2fs e2p support com_err ext2fs
     busybox
-    blkid uuid sepolicy_inject sepol6 sepol7 dynfilefs syshook inih payload fuse pthread dl pcre
+    blkid uuid sepolicy_inject sepol6 sepol7 dynfilefs emuwritefs syshook inih payload fuse pthread dl pcre
 )
 include_directories(
     include

@@ -38,6 +38,7 @@
 #include <lib/sefbinparser.h>
 #include <lib/sefsrcparser.h>
 #include <lib/dmcrypt.h>
+#include <lib/emuwritefs.h>
 #include <blkid/blkid.h>
 #include <ini.h>
 #include <sepolicy_inject.h>
@@ -1090,6 +1091,86 @@ static int setup_partition_replacements(void)
 
         // cleanup
         free(mbpathdevice);
+    }
+
+    if (multiboot_data.is_multiboot) {
+        // get parent devname
+        char* parentdevname = get_parent_devname(multiboot_data.espdev);
+        if (!parentdevname) {
+            LOGF("can't find parent device of ESP partition\n");
+        }
+
+        // build efs file list
+        void *efs_handle = emuwritefs_create_handle();
+        uevent_block_t *bi;
+        list_for_every_entry(multiboot_data.blockinfo, bi, uevent_block_t, node) {
+            if (!util_startswith(bi->devname, parentdevname))
+                continue;
+            if (util_get_replacement(bi->major, bi->minor))
+                continue;
+
+            // get dev path
+            rc = uevent_get_blkdev_path(bi, buf, sizeof(buf));
+            if (rc) {
+                MBABORT("Can't get path to block device\n");
+            }
+
+            // add file to efs
+            rc = emuwritefs_add_node(efs_handle, bi->devname, buf);
+            if (rc) {
+                MBABORT("Can't add %s to emufilefs\n", bi->devname);
+            }
+        }
+
+        // mount efs
+        pid_t pid = safe_fork();
+        if (!pid) {
+            util_mkdir(MBPATH_EFS);
+            exit(emuwritefs_main(efs_handle, MBPATH_EFS));
+        }
+        else {
+            waitpid(pid, &rc, 0);
+            if (rc) {
+                MBABORT("Can't add mount emuwritefs: %d\n", rc);
+            }
+        }
+
+        // setup partition replacements
+        list_for_every_entry(multiboot_data.blockinfo, bi, uevent_block_t, node) {
+            if (!util_startswith(bi->devname, parentdevname))
+                continue;
+            if (util_get_replacement(bi->major, bi->minor))
+                continue;
+
+            // build loopfile path
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf, sizeof(buf), MBPATH_EFS"/%s", bi->devname);
+
+            // build loop dev path
+            SAFE_SNPRINTF_RET(MBABORT, -1, buf2, sizeof(buf2), MBPATH_DEV"/block/emuwritefs:%s", bi->devname);
+
+            // setup replacement entry
+            part_replacement_t *replacement = safe_calloc(sizeof(part_replacement_t), 1);
+            pthread_mutex_init(&replacement->lock, NULL);
+            replacement->uevent_block = bi;
+            replacement->mountmode = PART_REPLACEMENT_MOUNTMODE_LOOP;
+            replacement->iomode = PART_REPLACEMENT_IOMODE_REDIRECT;
+            replacement->losetup_done = 1;
+            replacement->loopdevice = safe_strdup(buf2);
+            replacement->loopfile = safe_strdup(buf);
+            list_add_tail(&multiboot_data.replacements, &replacement->node);
+
+            // create new loop node
+            rc = util_make_loop(replacement->loopdevice);
+            if (rc) {
+                MBABORT("Can't create loop device at %s\n", replacement->loopdevice);
+            }
+
+            // setup loop device
+            rc = util_losetup(replacement->loopdevice, replacement->loopfile, false);
+            if (rc) {
+                MBABORT("Can't setup loop device at %s for %s: %d\n", replacement->loopdevice, replacement->loopfile, rc);
+            }
+        }
     }
 
     // in native-recovery, we don't want to block unmounting
