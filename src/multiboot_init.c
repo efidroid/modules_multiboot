@@ -231,10 +231,6 @@ int run_init(int trace)
     if (trace) {
         ret = multiboot_exec_tracee(par);
     } else {
-        // close all file handles
-        int fd;
-        for (fd=0; fd<10; fd++)
-            close(fd);
         ret = execvp(par[0], par);
     }
 
